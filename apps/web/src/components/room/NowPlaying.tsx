@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import YouTube from "react-youtube";
 import type { YouTubeEvent, YouTubePlayer } from "react-youtube";
 import { Pause, Play, SkipForward } from "lucide-react";
+import { toast } from "sonner";
 import type { PlaybackStateDTO } from "@musicapp/shared";
 import { projectPlaybackPosition } from "@/lib/playback";
 import { Button } from "@/components/ui/button";
@@ -21,9 +22,11 @@ const DRIFT_CHECK_INTERVAL_MS = 5000;
 const DRIFT_THRESHOLD_SECONDS = 1.5;
 
 /**
- * Renders the YouTube IFrame Player at 1x1px (never `display: none`) so the browser keeps
- * treating it as an active, audible tab — this is what allows playback to survive tab
- * switches, minimizing, and backgrounding, the same way Spotify Web behaves.
+ * Renders the YouTube IFrame Player at a tiny size, positioned off-screen — deliberately never
+ * `display: none` or `visibility: hidden`, since browsers (especially mobile ones) throttle or
+ * fully mute audio in iframes hidden that way. Positioning off-screen instead keeps it "active"
+ * from the browser's perspective, which is what lets playback survive tab switches and
+ * backgrounding, the same way Spotify Web behaves.
  */
 export function NowPlaying({ roomId, playbackState }: NowPlayingProps) {
   const playerRef = useRef<YouTubePlayer | null>(null);
@@ -102,14 +105,17 @@ export function NowPlaying({ roomId, playbackState }: NowPlayingProps) {
     return () => clearInterval(interval);
   }, [playbackState, hasInteracted]);
 
-  const handleStart = async () => {
+  // Deliberately synchronous (no async/await): mobile browsers only honor "this was triggered
+  // by a real tap" for a very short window, and yielding to a microtask before calling into the
+  // player can be enough to lose it, silently breaking audio on some mobile browsers.
+  const handleStart = () => {
     setHasInteracted(true);
     const player = playerRef.current;
     if (!player || !playbackState?.currentVideoId) return;
     appliedVideoId.current = playbackState.currentVideoId;
     const target = projectPlaybackPosition(playbackState);
-    await player.loadVideoById(playbackState.currentVideoId, target);
-    if (!playbackState.isPlaying) await player.pauseVideo();
+    player.loadVideoById(playbackState.currentVideoId, target);
+    if (!playbackState.isPlaying) player.pauseVideo();
   };
 
   const togglePlay = async () => {
@@ -135,17 +141,21 @@ export function NowPlaying({ roomId, playbackState }: NowPlayingProps) {
 
   return (
     <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 sm:p-6">
-      <div className="hidden" aria-hidden>
+      <div className="absolute -left-[9999px] top-0 h-px w-px overflow-hidden" aria-hidden>
         <YouTube
           opts={{
-            height: "1",
-            width: "1",
+            height: "2",
+            width: "2",
             playerVars: { autoplay: 0, controls: 0, disablekb: 1, modestbranding: 1, rel: 0, playsinline: 1 },
           }}
           onReady={(event: YouTubeEvent) => {
             playerRef.current = event.target;
           }}
           onEnd={() => songEnded()}
+          onError={(event: YouTubeEvent<number>) => {
+            toast.error("That video can't be played (removed, private, or embedding disabled) — skipping.");
+            skip();
+          }}
         />
       </div>
 

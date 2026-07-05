@@ -32,7 +32,7 @@ export function AddSongForm({ roomId, sessionId }: { roomId: string; sessionId: 
     >
       <div className="flex gap-2">
         <Input
-          placeholder="Paste a YouTube link (youtube.com/watch?v=... or youtu.be/...)"
+          placeholder="Paste a YouTube link (youtube.com, youtu.be, or music.youtube.com)"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           aria-invalid={!isValid}
