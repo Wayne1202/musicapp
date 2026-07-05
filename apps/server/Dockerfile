@@ -3,7 +3,7 @@
 # Railway: leave the service's Root Directory as the repo root and set the Dockerfile path to
 # apps/server/Dockerfile (see railway.json alongside this file).
 
-FROM node:20-alpine AS build
+FROM node:20-slim AS build
 WORKDIR /app
 
 # Copy just the manifests first so `npm ci` is cached unless a dependency actually changed.
@@ -23,13 +23,14 @@ RUN npm run db:generate --workspace=apps/server
 RUN npm run build --workspace=packages/shared
 RUN npm run build --workspace=apps/server
 
-FROM node:20-alpine AS runtime
+FROM node:20-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 
 # Same base image for build and runtime so the Prisma query engine generated during `npm ci`
-# (in the build stage) matches this stage's platform (linux-musl) — no binaryTargets override
-# needed in schema.prisma.
+# (in the build stage) matches this stage's platform. Debian-slim (not Alpine) is used
+# deliberately: Alpine's musl libc + OpenSSL 3-only setup is missing the libssl.so.1.1 that
+# Prisma's engine binary needs, which fails at runtime with a cryptic "loadLibrary" error.
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/packages/shared ./packages/shared
