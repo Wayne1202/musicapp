@@ -6,6 +6,11 @@
 FROM node:20-slim AS build
 WORKDIR /app
 
+# node:20-slim doesn't ship libssl either — Prisma's engine binary needs it present (and
+# needs it present *now*, before `npm ci`/`prisma generate` run below) so it can correctly
+# detect the OpenSSL version and pick/generate the matching engine.
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+
 # Copy just the manifests first so `npm ci` is cached unless a dependency actually changed.
 COPY package.json package-lock.json ./
 COPY apps/server/package.json apps/server/package.json
@@ -27,10 +32,10 @@ FROM node:20-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Same base image for build and runtime so the Prisma query engine generated during `npm ci`
-# (in the build stage) matches this stage's platform. Debian-slim (not Alpine) is used
-# deliberately: Alpine's musl libc + OpenSSL 3-only setup is missing the libssl.so.1.1 that
-# Prisma's engine binary needs, which fails at runtime with a cryptic "loadLibrary" error.
+# Same base image (+ openssl) as the build stage, for the same reason: the engine binary
+# generated above needs libssl actually present at runtime, not just at generate-time.
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/packages/shared ./packages/shared
