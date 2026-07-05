@@ -15,6 +15,11 @@ RUN npm ci
 COPY packages/shared packages/shared
 COPY apps/server apps/server
 
+# `npm ci` above ran before prisma/schema.prisma existed in the image (it's only in the
+# manifest-first layer for caching), so @prisma/client's install-time codegen had nothing to
+# read and produced an empty client. Generate explicitly now that the schema is present.
+RUN npm run db:generate --workspace=apps/server
+
 RUN npm run build --workspace=packages/shared
 RUN npm run build --workspace=apps/server
 
