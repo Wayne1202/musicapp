@@ -160,7 +160,7 @@ export function NowPlaying({ roomId, playbackState }: NowPlayingProps) {
       </div>
 
       <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center">
-        <div className="relative h-40 w-40 shrink-0 overflow-hidden rounded-lg bg-secondary shadow-lg sm:h-32 sm:w-32">
+        <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-secondary shadow-lg sm:h-32 sm:w-32">
           {playbackState?.currentThumbnail ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={playbackState.currentThumbnail} alt="" className="h-full w-full object-cover" />
