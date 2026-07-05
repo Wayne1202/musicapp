@@ -25,8 +25,14 @@ in `localStorage`. No email/OAuth.
    `queue_updated`, `song_changed`, `playback_started`, `playback_paused`,
    `playback_seeked`.
 6. Background playback — implemented by keeping the YouTube IFrame player
-   mounted at 1x1px (never `display:none`) so the browser treats the tab as
-   active/audible, Spotify-Web-style. See `apps/web/src/components/room/NowPlaying.tsx`.
+   mounted (2x2px, positioned off-screen, never `display:none`/
+   `visibility:hidden`) so the browser treats it as active/audible,
+   Spotify-Web-style. The player instance itself is owned by
+   `usePlayerController` (one instance per room, shared by the full
+   NowPlaying card and the mobile bottom bar) and rendered by
+   `apps/web/src/components/room/PlayerEngine.tsx`. Mobile browsers only
+   honor a "real user tap" for a brief synchronous window, so the first
+   play call is deliberately synchronous (no `await` before it).
 
 **UI:** dark-mode-first, Spotify/Discord-inspired, shadcn/ui components,
 responsive. Layout: header (room name, online count, invite) → add-song bar →
@@ -45,18 +51,50 @@ plain HTML controls), no Firebase/Supabase, guest sessions only, no karaoke.
 - **packages/shared** — types, Socket.IO event name/payload contracts, and
   YouTube URL parsing utilities shared by both apps (`@musicapp/shared`).
 - **Database** — PostgreSQL via Prisma (`apps/server/prisma/schema.prisma`:
-  `Room`, `UserSession`, `QueueItem`, `PlaybackState`).
+  `Room`, `UserSession`, `QueueItem`, `PlaybackState`, `RecentlyPlayedItem`,
+  `ChatMessage`).
 
 npm workspaces monorepo; root `package.json` has `dev`, `dev:server`,
 `dev:web`, `build`, `db:generate`, `db:migrate`, `db:studio`.
 
 ## Status
 
-All of the above is implemented (rooms, queue, playback sync, presence,
-background playback, dark-mode shadcn UI). Verified working end-to-end with a
-two-session Playwright run (create room → add song → auto-starts playback →
-second user joins by URL → both sessions see live presence/queue updates via
-Socket.IO). Not implemented: YouTube search (explicitly optional in the spec).
+**Deployed and live**: frontend on Vercel (`musicapp-web-fawn.vercel.app`),
+backend on Railway (Dockerfile-based, `musicappserver-production.up.railway.app`),
+database on Neon. GitHub: `github.com/Wayne1202/musicapp`, `main` branch,
+auto-deploys both services on push. See `README.md` for the full deploy
+walkthrough and `apps/server/Dockerfile`'s comments for the OpenSSL/Prisma
+gotchas that took a few iterations to get right on Railway (Alpine → Debian
+slim → explicit `apt-get install openssl`, and generating the Prisma client
+*after* `prisma/schema.prisma` is actually in the build context).
+
+Phase 1 (MVP) + Phase 2 (deploy) + Phase 3 (UX depth) are all implemented:
+rooms, queue (add/remove/move/drag-reorder/shuffle/clear/repeat, remaining
+play time), playback sync with periodic drift correction, song attribution
+(queue rows and now-playing), recently-played history, presence (typing
+indicator, colored avatars), toast notifications for room events, a mobile
+bottom mini-player bar, and a real-time room chat. Not implemented: YouTube
+search, auth beyond guest sessions, Spotify integration, karaoke — all
+explicitly out of scope per the spec.
+
+**Known platform limitation** (not a bug): audio does not continue when a
+phone's browser is backgrounded in favor of a *different app* (as opposed to
+switching browser tabs, which works fine). This is an OS-level restriction on
+cross-origin iframe media (our player is an embedded YouTube iframe) that
+every YouTube-embed-based web app hits — fixing it for real would require a
+native app or extracting YouTube's audio stream server-side (the latter
+violates YouTube's ToS and won't be implemented).
+
+**Mobile CSS gotcha worth knowing**: a flex item with `min-w-0 flex-1` plus a
+`truncate` child can still force horizontal viewport overflow with certain
+long/CJK text, even though that's the textbook fix — discovered via a queue
+row with a Korean title. The reliable fix that empirically closed it was
+adding an explicit `w-0` alongside `min-w-0 flex-1` (see `Queue.tsx`,
+`ChatPanel.tsx`, `RecentlyPlayed.tsx`, `BottomPlayerBar.tsx`,
+`AddSongForm.tsx`). Always verify mobile layout with a real Playwright
+mobile-viewport pass (checking `document.documentElement.scrollWidth` vs
+`clientWidth`) before calling a mobile change done — screenshots alone can
+look fine while overflow is actually present just off-frame.
 
 ## Local setup on this machine
 

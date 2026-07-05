@@ -7,11 +7,15 @@ import { getErrorMessage, getRoom, joinRoom } from "@/lib/api";
 import { getRoomSession, getStoredDisplayName, setRoomSession, storeDisplayName } from "@/lib/session";
 import type { RoomSession } from "@/lib/session";
 import { useRoomSocket } from "@/hooks/useRoomSocket";
+import { usePlayerController } from "@/hooks/usePlayerController";
 import { RoomHeader } from "@/components/room/RoomHeader";
 import { AddSongForm } from "@/components/room/AddSongForm";
 import { NowPlaying } from "@/components/room/NowPlaying";
+import { PlayerEngine } from "@/components/room/PlayerEngine";
+import { BottomPlayerBar } from "@/components/room/BottomPlayerBar";
 import { Queue } from "@/components/room/Queue";
 import { OnlineUsers } from "@/components/room/OnlineUsers";
+import { ChatPanel } from "@/components/room/ChatPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,6 +39,8 @@ export function RoomView({ code }: { code: string }) {
 
   const roomId = roomQuery.data?.room.id ?? null;
   const live = useRoomSocket(session ? roomId : null, session?.sessionId ?? null);
+  const playbackState = live.room?.playbackState ?? roomQuery.data?.room.playbackState ?? null;
+  const controller = usePlayerController(roomId, playbackState);
 
   if (!checkedStorage || roomQuery.isLoading) {
     return <RoomSkeleton />;
@@ -55,7 +61,7 @@ export function RoomView({ code }: { code: string }) {
   const room = live.room ?? roomQuery.data.room;
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-5xl flex-col gap-6 px-4 py-6 sm:py-8">
+    <main className="mx-auto flex min-h-screen max-w-5xl flex-col gap-6 px-4 py-6 pb-20 sm:py-8 sm:pb-8">
       <RoomHeader
         roomName={room.name}
         roomCode={room.code}
@@ -63,18 +69,24 @@ export function RoomView({ code }: { code: string }) {
         connected={live.connected}
       />
 
+      <PlayerEngine controller={controller} />
+
       <AddSongForm roomId={room.id} sessionId={session.sessionId} />
 
-      <NowPlaying roomId={room.id} playbackState={room.playbackState} />
+      <NowPlaying playbackState={room.playbackState} controller={controller} />
 
       <div className="grid gap-6 sm:grid-cols-3">
         <div className="sm:col-span-2">
           <Queue queue={room.queue} roomId={room.id} sessionId={session.sessionId} repeatQueue={room.repeatQueue} />
         </div>
         <div>
-          <OnlineUsers users={room.onlineUsers} currentSessionId={session.sessionId} />
+          <OnlineUsers users={room.onlineUsers} currentSessionId={session.sessionId} typingUsers={live.typingUsers} />
         </div>
       </div>
+
+      <ChatPanel roomId={room.id} sessionId={session.sessionId} liveMessages={live.messages} />
+
+      <BottomPlayerBar playbackState={room.playbackState} controller={controller} />
     </main>
   );
 }
@@ -152,7 +164,7 @@ function RoomSkeleton() {
 
       <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 sm:p-6">
         <div className="flex flex-col items-center gap-4 sm:flex-row">
-          <Skeleton className="h-40 w-40 shrink-0 rounded-lg sm:h-32 sm:w-32" />
+          <Skeleton className="h-24 w-24 shrink-0 rounded-lg sm:h-32 sm:w-32" />
           <div className="flex w-full flex-col gap-3">
             <Skeleton className="h-5 w-2/3" />
             <Skeleton className="h-2 w-full rounded-full" />

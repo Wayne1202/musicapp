@@ -7,6 +7,7 @@ import {
   getErrorMessage,
   moveQueueItem as moveQueueItemRequest,
   removeFromQueue as removeFromQueueRequest,
+  reorderQueue as reorderQueueRequest,
   setRepeatQueue as setRepeatQueueRequest,
   shuffleQueue as shuffleQueueRequest,
 } from "@/lib/api";
@@ -26,6 +27,11 @@ export function useQueueActions(roomId: string | null, sessionId: string | null)
   const moveMutation = useMutation({
     mutationFn: ({ itemId, direction }: { itemId: string; direction: "up" | "down" }) =>
       moveQueueItemRequest(roomId!, sessionId!, itemId, direction),
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+
+  const reorderMutation = useMutation({
+    mutationFn: (orderedItemIds: string[]) => reorderQueueRequest(roomId!, sessionId!, orderedItemIds),
     onError: (err) => toast.error(getErrorMessage(err)),
   });
 
@@ -50,6 +56,7 @@ export function useQueueActions(roomId: string | null, sessionId: string | null)
     remove: (itemId: string) => ready && removeMutation.mutate(itemId),
     moveUp: (itemId: string) => ready && moveMutation.mutate({ itemId, direction: "up" }),
     moveDown: (itemId: string) => ready && moveMutation.mutate({ itemId, direction: "down" }),
+    reorder: (orderedItemIds: string[]) => ready && reorderMutation.mutate(orderedItemIds),
     clear: () => ready && clearMutation.mutate(),
     shuffle: () => ready && shuffleMutation.mutate(),
     setRepeat: (enabled: boolean) => ready && repeatMutation.mutate(enabled),

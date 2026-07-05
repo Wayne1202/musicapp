@@ -2,7 +2,9 @@ import { SocketEvents } from "@musicapp/shared";
 import type {
   JoinRoomPayload,
   PlaybackActionPayload,
+  SendMessagePayload,
   SkipSongPayload,
+  TypingPayload,
 } from "@musicapp/shared";
 import {
   getRoomDTOById,
@@ -12,8 +14,16 @@ import {
 } from "../services/roomService";
 import { getQueue } from "../services/queueService";
 import { advanceToNextSong, getLivePlaybackState, pause, play, seek } from "../services/playbackService";
+import { sendMessage } from "../services/chatService";
 import { logger } from "../lib/logger";
+import { HttpError } from "../lib/http-error";
 import type { TypedServer, TypedSocket } from "../types/socket";
+
+// Safety net for the typing indicator: if a client goes silent mid-type without sending
+// TYPING(false) (closed tab, lost connection), clear it after this much inactivity instead of
+// leaving "X is typing…" stuck forever.
+const TYPING_TIMEOUT_MS = 4000;
+const typingTimeoutsBySessionId = new Map<string, ReturnType<typeof setTimeout>>();
 
 // Every client in a room independently detects "song ended" / may click skip at the same
 // moment, which would each try to advance the queue. Debounce per room so a burst of these
@@ -41,6 +51,7 @@ export function registerSocketHandlers(io: TypedServer) {
 
         socket.data.roomId = payload.roomId;
         socket.data.sessionId = payload.sessionId;
+        socket.data.displayName = session.displayName;
         await socket.join(payload.roomId);
         await setSessionOnlineStatus(payload.sessionId, true);
 
@@ -112,9 +123,60 @@ export function registerSocketHandlers(io: TypedServer) {
     socket.on(SocketEvents.SONG_ENDED, handleAdvance);
     socket.on(SocketEvents.SKIP_SONG, handleAdvance);
 
+    socket.on(SocketEvents.TYPING, ({ roomId, isTyping }: TypingPayload) => {
+      const { sessionId, displayName } = socket.data;
+      if (!sessionId || !displayName) return;
+
+      const existingTimeout = typingTimeoutsBySessionId.get(sessionId);
+      if (existingTimeout) clearTimeout(existingTimeout);
+
+      socket.to(roomId).emit(SocketEvents.USER_TYPING, { sessionId, displayName, isTyping });
+
+      if (isTyping) {
+        typingTimeoutsBySessionId.set(
+          sessionId,
+          setTimeout(() => {
+            socket.to(roomId).emit(SocketEvents.USER_TYPING, { sessionId, displayName, isTyping: false });
+            typingTimeoutsBySessionId.delete(sessionId);
+          }, TYPING_TIMEOUT_MS),
+        );
+      } else {
+        typingTimeoutsBySessionId.delete(sessionId);
+      }
+    });
+
+    socket.on(SocketEvents.SEND_MESSAGE, async ({ roomId, content }: SendMessagePayload) => {
+      const { sessionId, displayName } = socket.data;
+      if (!sessionId || !displayName) return;
+      try {
+        const message = await sendMessage(roomId, sessionId, displayName, content);
+        io.to(roomId).emit(SocketEvents.MESSAGE_RECEIVED, { message });
+      } catch (err) {
+        // HttpError messages here are validation feedback (e.g. "message too long") that's
+        // fine to show as-is; anything else is unexpected and worth logging server-side too.
+        const errMessage = err instanceof Error ? err.message : "Failed to send message";
+        if (!(err instanceof HttpError)) logger.error("socket", "send_message failed", err);
+        socket.emit(SocketEvents.ERROR, { message: errMessage });
+      }
+    });
+
     socket.on("disconnect", async () => {
       const { roomId, sessionId } = socket.data;
       if (!roomId || !sessionId) return;
+
+      const typingTimeout = typingTimeoutsBySessionId.get(sessionId);
+      if (typingTimeout) {
+        clearTimeout(typingTimeout);
+        typingTimeoutsBySessionId.delete(sessionId);
+        socket.to(roomId).emit(SocketEvents.USER_TYPING, {
+          sessionId,
+          displayName: socket.data.displayName,
+          isTyping: false,
+        });
+      }
+      // Captured synchronously, before any await, so it reflects the instant this socket
+      // actually dropped — used below to detect a reconnect that raced ahead of us.
+      const disconnectedAt = new Date();
 
       try {
         // Another tab/connection for the same session may still be open; only mark
@@ -122,6 +184,14 @@ export function registerSocketHandlers(io: TypedServer) {
         const socketsInRoom = await io.in(roomId).fetchSockets();
         const stillConnected = socketsInRoom.some((s) => s.data.sessionId === sessionId);
         if (stillConnected) return;
+
+        // A page refresh tears down this socket and immediately opens a new one, which
+        // races this handler's disconnect-detection against the new socket's join_room.
+        // If a fresh join/heartbeat already landed after we detected the disconnect, that
+        // reconnect is authoritative — writing "offline" now would incorrectly clobber it
+        // (this is what caused online counts to briefly show 0 right after a reload).
+        const session = await getSessionById(sessionId);
+        if (session && session.lastSeenAt > disconnectedAt) return;
 
         await setSessionOnlineStatus(sessionId, false);
         const onlineUsers = await getOnlineUsers(roomId);

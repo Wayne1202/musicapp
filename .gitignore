@@ -11,5 +11,5 @@ npm-debug.log*
 
 .DS_Store
 
-# Local Claude Code tool permissions — machine-specific, not meant to be shared.
-.claude/settings.local.json
+# Local Claude Code tool state — machine-specific, not meant to be shared.
+.claude/

@@ -64,7 +64,12 @@ export function createRoomsRouter(io: TypedServer): Router {
       const roomId = req.params.roomId;
       const sessionId = req.session!.id;
 
-      const { queueItem, startedImmediately } = await addSongFromUrl(roomId, sessionId, url.trim());
+      const { queueItem, startedImmediately } = await addSongFromUrl(
+        roomId,
+        sessionId,
+        req.session!.displayName,
+        url.trim(),
+      );
 
       if (startedImmediately) {
         const playbackState = await getLivePlaybackState(roomId);

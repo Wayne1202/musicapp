@@ -1,10 +1,12 @@
 import type {
   AddSongResponse,
+  ChatHistoryResponse,
   CreateRoomRequest,
   CreateRoomResponse,
   JoinRoomRequest,
   JoinRoomResponse,
   QueueMutationResponse,
+  RecentlyPlayedResponse,
   RoomDTO,
 } from "@musicapp/shared";
 
@@ -79,6 +81,14 @@ export function moveQueueItem(roomId: string, sessionId: string, itemId: string,
   });
 }
 
+export function reorderQueue(roomId: string, sessionId: string, orderedItemIds: string[]) {
+  return request<QueueMutationResponse>(`/api/rooms/${roomId}/queue/reorder`, {
+    method: "PUT",
+    headers: { "x-session-id": sessionId },
+    body: JSON.stringify({ orderedItemIds }),
+  });
+}
+
 export function clearQueue(roomId: string, sessionId: string) {
   return request<QueueMutationResponse>(`/api/rooms/${roomId}/queue/clear`, {
     method: "POST",
@@ -99,4 +109,12 @@ export function setRepeatQueue(roomId: string, sessionId: string, enabled: boole
     headers: { "x-session-id": sessionId },
     body: JSON.stringify({ enabled }),
   });
+}
+
+export function getRecentlyPlayed(roomId: string) {
+  return request<RecentlyPlayedResponse>(`/api/rooms/${roomId}/recently-played`);
+}
+
+export function getChatHistory(roomId: string) {
+  return request<ChatHistoryResponse>(`/api/rooms/${roomId}/messages`);
 }

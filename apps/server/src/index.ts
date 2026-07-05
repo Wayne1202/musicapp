@@ -10,6 +10,8 @@ import { HttpError } from "./lib/http-error";
 import { logger } from "./lib/logger";
 import { createRoomsRouter } from "./routes/rooms";
 import { createQueueRouter } from "./routes/queue";
+import { createHistoryRouter } from "./routes/history";
+import { createChatRouter } from "./routes/chat";
 import { registerSocketHandlers } from "./socket";
 import type { SocketData } from "./types/socket";
 
@@ -27,6 +29,8 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents, Record<string,
 app.get("/health", (_req, res) => res.json({ ok: true }));
 app.use("/api/rooms", createRoomsRouter(io));
 app.use("/api/rooms", createQueueRouter(io));
+app.use("/api/rooms", createHistoryRouter());
+app.use("/api/rooms", createChatRouter());
 
 const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   if (err instanceof HttpError) {

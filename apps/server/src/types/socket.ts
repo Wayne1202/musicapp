@@ -4,6 +4,7 @@ import type { ClientToServerEvents, ServerToClientEvents } from "@musicapp/share
 export interface SocketData {
   roomId: string;
   sessionId: string;
+  displayName: string;
 }
 
 export type TypedServer = Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>;

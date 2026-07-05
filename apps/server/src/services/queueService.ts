@@ -22,6 +22,7 @@ export async function getQueue(roomId: string): Promise<QueueItemDTO[]> {
 export async function addSongFromUrl(
   roomId: string,
   sessionId: string,
+  displayName: string,
   url: string,
 ): Promise<{ queueItem: QueueItemDTO | null; startedImmediately: boolean }> {
   const videoId = extractYouTubeVideoId(url);
@@ -49,6 +50,8 @@ export async function addSongFromUrl(
       title: metadata.title,
       thumbnail: metadata.thumbnail,
       duration: metadata.duration,
+      addedById: sessionId,
+      addedByName: displayName,
     });
     return { queueItem: null, startedImmediately: true };
   }
@@ -135,6 +138,23 @@ export async function moveQueueItem(roomId: string, itemId: string, direction: "
     prisma.queueItem.update({ where: { id: a.id }, data: { position: b.position } }),
     prisma.queueItem.update({ where: { id: b.id }, data: { position: a.position } }),
   ]);
+}
+
+/**
+ * Applies a full drag-and-drop reorder: `orderedItemIds` is the complete new order of every
+ * item currently in the room's queue. Positions are reassigned sequentially to match.
+ */
+export async function reorderQueue(roomId: string, orderedItemIds: string[]): Promise<void> {
+  const items = await prisma.queueItem.findMany({ where: { roomId } });
+  const itemIds = new Set(items.map((item) => item.id));
+
+  if (orderedItemIds.length !== items.length || !orderedItemIds.every((id) => itemIds.has(id))) {
+    throw new HttpError(400, "orderedItemIds must contain exactly the current queue's item ids");
+  }
+
+  await prisma.$transaction(
+    orderedItemIds.map((id, index) => prisma.queueItem.update({ where: { id }, data: { position: index } })),
+  );
 }
 
 export async function clearQueue(roomId: string): Promise<void> {

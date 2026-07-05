@@ -31,7 +31,30 @@ export interface PlaybackStateDTO {
   /** Playback position in seconds at the time of `updatedAt`. */
   currentTimestamp: number;
   isPlaying: boolean;
+  currentAddedById: string | null;
+  currentAddedByName: string | null;
   updatedAt: string;
+}
+
+export interface RecentlyPlayedItemDTO {
+  id: string;
+  roomId: string;
+  videoId: string;
+  title: string;
+  thumbnail: string;
+  /** Duration in seconds. */
+  duration: number;
+  addedByName: string | null;
+  playedAt: string;
+}
+
+export interface ChatMessageDTO {
+  id: string;
+  roomId: string;
+  sessionId: string;
+  displayName: string;
+  content: string;
+  createdAt: string;
 }
 
 export interface RoomDTO {
@@ -77,10 +100,31 @@ export interface MoveQueueItemRequest {
   direction: "up" | "down";
 }
 
+export interface ReorderQueueRequest {
+  orderedItemIds: string[];
+}
+
 export interface SetRepeatQueueRequest {
   enabled: boolean;
 }
 
+/** Describes what just happened to the queue, so listeners can show an accurate toast
+ *  instead of a generic "queue updated" message. */
+export interface QueueChangeReason {
+  type: "removed" | "moved" | "cleared" | "shuffled" | "reordered";
+  actorName: string;
+  songTitle?: string;
+}
+
 export interface QueueMutationResponse {
   queue: QueueItemDTO[];
+  reason?: QueueChangeReason;
+}
+
+export interface RecentlyPlayedResponse {
+  items: RecentlyPlayedItemDTO[];
+}
+
+export interface ChatHistoryResponse {
+  messages: ChatMessageDTO[];
 }

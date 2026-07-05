@@ -1,5 +1,5 @@
-import type { PlaybackState, QueueItem, Room, UserSession } from "@prisma/client";
-import type { PlaybackStateDTO, QueueItemDTO, RoomDTO, UserSessionDTO } from "@musicapp/shared";
+import type { PlaybackState, QueueItem, RecentlyPlayedItem, Room, UserSession } from "@prisma/client";
+import type { PlaybackStateDTO, QueueItemDTO, RecentlyPlayedItemDTO, RoomDTO, UserSessionDTO } from "@musicapp/shared";
 
 // If a session's heartbeat hasn't refreshed `lastSeenAt` within this window, treat it as
 // offline even if `isOnline` is still true — covers the case where the server process was
@@ -43,7 +43,22 @@ export function serializePlaybackState(state: PlaybackState): PlaybackStateDTO {
     currentDuration: state.currentDuration,
     currentTimestamp: state.currentTimestamp,
     isPlaying: state.isPlaying,
+    currentAddedById: state.currentAddedById,
+    currentAddedByName: state.currentAddedByName,
     updatedAt: state.updatedAt.toISOString(),
+  };
+}
+
+export function serializeRecentlyPlayedItem(item: RecentlyPlayedItem): RecentlyPlayedItemDTO {
+  return {
+    id: item.id,
+    roomId: item.roomId,
+    videoId: item.videoId,
+    title: item.title,
+    thumbnail: item.thumbnail,
+    duration: item.duration,
+    addedByName: item.addedByName,
+    playedAt: item.playedAt.toISOString(),
   };
 }
 

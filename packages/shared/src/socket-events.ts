@@ -1,4 +1,4 @@
-import type { PlaybackStateDTO, QueueItemDTO, RoomDTO, UserSessionDTO } from "./types";
+import type { ChatMessageDTO, PlaybackStateDTO, QueueChangeReason, QueueItemDTO, RoomDTO, UserSessionDTO } from "./types";
 
 // Event name constants shared by client and server so both sides stay in sync.
 export const SocketEvents = {
@@ -11,6 +11,8 @@ export const SocketEvents = {
   PLAYBACK_SYNC_REQUEST: "playback_sync_request",
   SONG_ENDED: "song_ended",
   SKIP_SONG: "skip_song",
+  TYPING: "typing",
+  SEND_MESSAGE: "send_message",
 
   // --- Server -> Client ---
   ROOM_STATE: "room_state",
@@ -22,6 +24,8 @@ export const SocketEvents = {
   PLAYBACK_STARTED: "playback_started",
   PLAYBACK_PAUSED: "playback_paused",
   PLAYBACK_SEEKED: "playback_seeked",
+  USER_TYPING: "user_typing",
+  MESSAGE_RECEIVED: "message_received",
   ERROR: "error_event",
 } as const;
 
@@ -60,6 +64,7 @@ export interface SongAddedPayload {
 
 export interface QueueUpdatedPayload {
   queue: QueueItemDTO[];
+  reason?: QueueChangeReason;
 }
 
 export interface SongChangedPayload {
@@ -83,6 +88,26 @@ export interface ErrorEventPayload {
   message: string;
 }
 
+export interface TypingPayload {
+  roomId: string;
+  isTyping: boolean;
+}
+
+export interface UserTypingPayload {
+  sessionId: string;
+  displayName: string;
+  isTyping: boolean;
+}
+
+export interface SendMessagePayload {
+  roomId: string;
+  content: string;
+}
+
+export interface MessageReceivedPayload {
+  message: ChatMessageDTO;
+}
+
 // Typed maps for use with socket.io-client's generic Socket<ListenEvents, EmitEvents>.
 export interface ServerToClientEvents {
   [SocketEvents.ROOM_STATE]: (payload: RoomStatePayload) => void;
@@ -94,6 +119,8 @@ export interface ServerToClientEvents {
   [SocketEvents.PLAYBACK_STARTED]: (payload: PlaybackStartedPayload) => void;
   [SocketEvents.PLAYBACK_PAUSED]: (payload: PlaybackPausedPayload) => void;
   [SocketEvents.PLAYBACK_SEEKED]: (payload: PlaybackSeekedPayload) => void;
+  [SocketEvents.USER_TYPING]: (payload: UserTypingPayload) => void;
+  [SocketEvents.MESSAGE_RECEIVED]: (payload: MessageReceivedPayload) => void;
   [SocketEvents.ERROR]: (payload: ErrorEventPayload) => void;
 }
 
@@ -106,4 +133,6 @@ export interface ClientToServerEvents {
   [SocketEvents.PLAYBACK_SYNC_REQUEST]: (payload: { roomId: string }) => void;
   [SocketEvents.SONG_ENDED]: (payload: SkipSongPayload) => void;
   [SocketEvents.SKIP_SONG]: (payload: SkipSongPayload) => void;
+  [SocketEvents.TYPING]: (payload: TypingPayload) => void;
+  [SocketEvents.SEND_MESSAGE]: (payload: SendMessagePayload) => void;
 }
