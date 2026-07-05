@@ -1,0 +1,15 @@
+node_modules/
+.next/
+dist/
+*.tsbuildinfo
+
+.env
+.env.local
+.env.*.local
+
+npm-debug.log*
+
+.DS_Store
+
+# Local Claude Code tool permissions — machine-specific, not meant to be shared.
+.claude/settings.local.json

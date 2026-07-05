@@ -1,0 +1,20 @@
+{
+  "name": "musicapp",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=apps/server & npm run dev --workspace=apps/web",
+    "dev:server": "npm run dev --workspace=apps/server",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "build": "npm run build --workspace=packages/shared && npm run build --workspace=apps/server && npm run build --workspace=apps/web",
+    "db:generate": "npm run db:generate --workspace=apps/server",
+    "db:migrate": "npm run db:migrate --workspace=apps/server",
+    "db:studio": "npm run db:studio --workspace=apps/server"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}

@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: musicapp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: musicapp
+      POSTGRES_PASSWORD: musicapp
+      POSTGRES_DB: musicapp
+    ports:
+      - "5432:5432"
+    volumes:
+      - musicapp-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U musicapp -d musicapp"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  musicapp-postgres-data:
