@@ -75,6 +75,18 @@ export function serializeRoom(room: RoomWithRelations): RoomDTO {
     name: room.name,
     repeatQueue: room.repeatQueue,
     createdAt: room.createdAt.toISOString(),
+    status: room.status,
+    hostSessionId: room.hostSessionId,
+    settings: {
+      queueAddPermission: room.queueAddPermission,
+      skipMode: room.skipMode,
+      repeatQueue: room.repeatQueue,
+      autoShuffle: room.autoShuffle,
+      chatEnabled: room.chatEnabled,
+      reactionsEnabled: room.reactionsEnabled,
+      allowGuestReorder: room.allowGuestReorder,
+      queueLocked: room.queueLocked,
+    },
     playbackState: room.playbackState ? serializePlaybackState(room.playbackState) : null,
     queue: room.queueItems
       .sort((a, b) => a.position - b.position)

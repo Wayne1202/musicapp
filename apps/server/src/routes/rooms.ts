@@ -6,8 +6,8 @@ import type {
   JoinRoomRequest,
   JoinRoomResponse,
 } from "@musicapp/shared";
-import { SocketEvents } from "@musicapp/shared";
-import { createRoom, getRoomDTOById, getRoomIdByCode, joinRoomByCode } from "../services/roomService";
+import { SocketEvents, canAddSong } from "@musicapp/shared";
+import { createRoom, getRoomDTOById, getRoomIdByCode, getRoomRecord, joinRoomByCode } from "../services/roomService";
 import { addSongFromUrl, getQueue } from "../services/queueService";
 import { getLivePlaybackState } from "../services/playbackService";
 import { requireSession } from "../middleware/sessionAuth";
@@ -63,6 +63,11 @@ export function createRoomsRouter(io: TypedServer): Router {
 
       const roomId = req.params.roomId;
       const sessionId = req.session!.id;
+
+      const room = await getRoomRecord(roomId);
+      if (!canAddSong(room, sessionId)) {
+        throw new HttpError(403, "Only the host can add songs to this room right now");
+      }
 
       const { queueItem, startedImmediately } = await addSongFromUrl(
         roomId,

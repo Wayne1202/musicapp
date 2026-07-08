@@ -6,7 +6,7 @@ import type {
   ReorderQueueRequest,
   SetRepeatQueueRequest,
 } from "@musicapp/shared";
-import { SocketEvents } from "@musicapp/shared";
+import { SocketEvents, canChangeRoomSettings, canEditQueue, canShuffleOrClear } from "@musicapp/shared";
 import {
   clearQueue,
   getQueue,
@@ -16,7 +16,7 @@ import {
   setRepeatQueue,
   shuffleQueue,
 } from "../services/queueService";
-import { getRoomDTOById } from "../services/roomService";
+import { getRoomDTOById, getRoomRecord } from "../services/roomService";
 import { requireSession } from "../middleware/sessionAuth";
 import { HttpError } from "../lib/http-error";
 import type { TypedServer } from "../types/socket";
@@ -35,6 +35,11 @@ export function createQueueRouter(io: TypedServer): Router {
 
   router.delete("/:roomId/queue/:itemId", requireSession, async (req, res, next) => {
     try {
+      const room = await getRoomRecord(req.params.roomId);
+      if (!canEditQueue(room, req.session!.id)) {
+        throw new HttpError(403, "You don't have permission to edit the queue");
+      }
+
       const queueBefore = await getQueue(req.params.roomId);
       const removed = queueBefore.find((item) => item.id === req.params.itemId);
 
@@ -52,6 +57,11 @@ export function createQueueRouter(io: TypedServer): Router {
 
   router.patch("/:roomId/queue/:itemId/move", requireSession, async (req, res, next) => {
     try {
+      const room = await getRoomRecord(req.params.roomId);
+      if (!canEditQueue(room, req.session!.id)) {
+        throw new HttpError(403, "You don't have permission to edit the queue");
+      }
+
       const { direction } = req.body as MoveQueueItemRequest;
       if (direction !== "up" && direction !== "down") {
         throw new HttpError(400, 'direction must be "up" or "down"');
@@ -69,6 +79,11 @@ export function createQueueRouter(io: TypedServer): Router {
 
   router.put("/:roomId/queue/reorder", requireSession, async (req, res, next) => {
     try {
+      const room = await getRoomRecord(req.params.roomId);
+      if (!canEditQueue(room, req.session!.id)) {
+        throw new HttpError(403, "You don't have permission to edit the queue");
+      }
+
       const { orderedItemIds } = req.body as ReorderQueueRequest;
       if (!Array.isArray(orderedItemIds) || orderedItemIds.some((id) => typeof id !== "string")) {
         throw new HttpError(400, "orderedItemIds must be an array of strings");
@@ -86,6 +101,11 @@ export function createQueueRouter(io: TypedServer): Router {
 
   router.post("/:roomId/queue/clear", requireSession, async (req, res, next) => {
     try {
+      const room = await getRoomRecord(req.params.roomId);
+      if (!canShuffleOrClear(room, req.session!.id)) {
+        throw new HttpError(403, "Only the host can clear the queue");
+      }
+
       await clearQueue(req.params.roomId);
       const queue = await broadcastQueue(req.params.roomId, {
         type: "cleared",
@@ -99,6 +119,11 @@ export function createQueueRouter(io: TypedServer): Router {
 
   router.post("/:roomId/queue/shuffle", requireSession, async (req, res, next) => {
     try {
+      const room = await getRoomRecord(req.params.roomId);
+      if (!canShuffleOrClear(room, req.session!.id)) {
+        throw new HttpError(403, "Only the host can shuffle the queue");
+      }
+
       await shuffleQueue(req.params.roomId);
       const queue = await broadcastQueue(req.params.roomId, {
         type: "shuffled",
@@ -112,6 +137,11 @@ export function createQueueRouter(io: TypedServer): Router {
 
   router.patch("/:roomId/repeat", requireSession, async (req, res, next) => {
     try {
+      const roomRecord = await getRoomRecord(req.params.roomId);
+      if (!canChangeRoomSettings(roomRecord, req.session!.id)) {
+        throw new HttpError(403, "Only the host can change room settings");
+      }
+
       const { enabled } = req.body as SetRepeatQueueRequest;
       if (typeof enabled !== "boolean") {
         throw new HttpError(400, "enabled must be a boolean");

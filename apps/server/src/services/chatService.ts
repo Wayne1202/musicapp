@@ -1,3 +1,4 @@
+import type { ChatMessage } from "@prisma/client";
 import type { ChatMessageDTO } from "@musicapp/shared";
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../lib/http-error";
@@ -5,20 +6,14 @@ import { HttpError } from "../lib/http-error";
 const MAX_MESSAGE_LENGTH = 500;
 const HISTORY_LIMIT = 50;
 
-function serializeChatMessage(message: {
-  id: string;
-  roomId: string;
-  sessionId: string;
-  displayName: string;
-  content: string;
-  createdAt: Date;
-}): ChatMessageDTO {
+function serializeChatMessage(message: ChatMessage): ChatMessageDTO {
   return {
     id: message.id,
     roomId: message.roomId,
     sessionId: message.sessionId,
     displayName: message.displayName,
     content: message.content,
+    type: message.type,
     createdAt: message.createdAt.toISOString(),
   };
 }
@@ -47,7 +42,18 @@ export async function sendMessage(
   }
 
   const message = await prisma.chatMessage.create({
-    data: { roomId, sessionId, displayName, content: trimmed },
+    data: { roomId, sessionId, displayName, content: trimmed, type: "USER" },
+  });
+  return serializeChatMessage(message);
+}
+
+/** Inserts a server-generated system message ("Alex joined", "Charlie skipped a song", ...)
+ *  into the same chat stream guests already see, instead of a parallel notification channel.
+ *  Used directly for transient color (skip/vote-started) and via roomEventService for entries
+ *  that also get a persisted RoomEvent row (join/leave/host-transfer/...). */
+export async function sendSystemMessage(roomId: string, content: string): Promise<ChatMessageDTO> {
+  const message = await prisma.chatMessage.create({
+    data: { roomId, sessionId: null, displayName: "System", content, type: "SYSTEM" },
   });
   return serializeChatMessage(message);
 }

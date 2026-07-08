@@ -25,7 +25,7 @@ export async function createRoom(
 ): Promise<{ room: RoomDTO; session: UserSessionDTO }> {
   const code = await generateUniqueRoomCode();
 
-  const room = await prisma.room.create({
+  const created = await prisma.room.create({
     data: {
       code,
       name: roomName,
@@ -35,7 +35,14 @@ export async function createRoom(
     include: roomInclude,
   });
 
-  const session = room.sessions[0];
+  // Creator automatically becomes host.
+  const session = created.sessions[0];
+  const room = await prisma.room.update({
+    where: { id: created.id },
+    data: { hostSessionId: session.id },
+    include: roomInclude,
+  });
+
   return { room: serializeRoom(room), session: serializeSession(session) };
 }
 
@@ -47,10 +54,21 @@ export async function joinRoomByCode(
   if (!existingRoom) {
     throw new HttpError(404, `Room "${code}" not found`);
   }
+  if (existingRoom.status === "ENDED") {
+    throw new HttpError(410, "This room has ended");
+  }
 
   const session = await prisma.userSession.create({
     data: { roomId: existingRoom.id, displayName, isOnline: true },
   });
+
+  // Joining an empty room (no current host, e.g. everyone left) makes you the new host.
+  if (!existingRoom.hostSessionId) {
+    await prisma.room.updateMany({
+      where: { id: existingRoom.id, hostSessionId: null },
+      data: { hostSessionId: session.id },
+    });
+  }
 
   const room = await prisma.room.findUniqueOrThrow({
     where: { id: existingRoom.id },
@@ -60,10 +78,75 @@ export async function joinRoomByCode(
   return { room: serializeRoom(room), session: serializeSession(session) };
 }
 
+/** Reconnect path (existing session, no new REST join call): claims host if the room is
+ *  currently host-less, e.g. the host's tab reconnects after everyone else had left too. */
+export async function becomeHostIfNone(roomId: string, sessionId: string): Promise<void> {
+  await prisma.room.updateMany({
+    where: { id: roomId, hostSessionId: null },
+    data: { hostSessionId: sessionId },
+  });
+}
+
+export async function transferHost(roomId: string, targetSessionId: string): Promise<UserSessionDTO> {
+  const target = await prisma.userSession.findFirst({
+    where: { id: targetSessionId, roomId, isOnline: true },
+  });
+  if (!target) throw new HttpError(404, "Target user is not online in this room");
+
+  await prisma.room.update({ where: { id: roomId }, data: { hostSessionId: targetSessionId } });
+  return serializeSession(target);
+}
+
+/** Called after a disconnecting session has been marked offline. Promotes the
+ *  earliest-joined still-online user to host if — and only if — the departing session was
+ *  the host; returns the new host (or null if the room is now empty / departer wasn't host). */
+export async function reassignHostOnDisconnect(
+  roomId: string,
+  departingSessionId: string,
+  onlineUsers: UserSessionDTO[],
+): Promise<UserSessionDTO | null> {
+  const room = await prisma.room.findUnique({ where: { id: roomId }, select: { hostSessionId: true } });
+  if (!room || room.hostSessionId !== departingSessionId) return null;
+
+  const nextHost = onlineUsers[0] ?? null;
+  await prisma.room.update({ where: { id: roomId }, data: { hostSessionId: nextHost?.id ?? null } });
+  return nextHost;
+}
+
+export async function endRoom(roomId: string): Promise<void> {
+  await prisma.room.update({ where: { id: roomId }, data: { status: "ENDED" } });
+}
+
+export async function setQueueLock(roomId: string, locked: boolean): Promise<void> {
+  await prisma.room.update({ where: { id: roomId }, data: { queueLocked: locked } });
+}
+
+export async function updateRoomSettings(
+  roomId: string,
+  patch: Partial<{
+    queueAddPermission: "ANYONE" | "HOST_ONLY";
+    skipMode: "ANYONE" | "HOST_ONLY" | "VOTE";
+    autoShuffle: boolean;
+    chatEnabled: boolean;
+    reactionsEnabled: boolean;
+    allowGuestReorder: boolean;
+  }>,
+): Promise<void> {
+  await prisma.room.update({ where: { id: roomId }, data: patch });
+}
+
 export async function getRoomDTOById(roomId: string): Promise<RoomDTO> {
   const room = await prisma.room.findUnique({ where: { id: roomId }, include: roomInclude });
   if (!room) throw new HttpError(404, "Room not found");
   return serializeRoom(room);
+}
+
+/** Raw Room record (not the DTO) for callers that only need settings/host fields to run a
+ *  permission check — e.g. permissions.ts — without paying for the full include. */
+export async function getRoomRecord(roomId: string) {
+  const room = await prisma.room.findUnique({ where: { id: roomId } });
+  if (!room) throw new HttpError(404, "Room not found");
+  return room;
 }
 
 export async function getRoomIdByCode(code: string): Promise<string | null> {

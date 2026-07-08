@@ -8,6 +8,7 @@ import type {
   QueueMutationResponse,
   RecentlyPlayedResponse,
   RoomDTO,
+  RoomHistoryResponse,
 } from "@musicapp/shared";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -113,6 +114,10 @@ export function setRepeatQueue(roomId: string, sessionId: string, enabled: boole
 
 export function getRecentlyPlayed(roomId: string) {
   return request<RecentlyPlayedResponse>(`/api/rooms/${roomId}/recently-played`);
+}
+
+export function getRoomHistory(roomId: string) {
+  return request<RoomHistoryResponse>(`/api/rooms/${roomId}/history`);
 }
 
 export function getChatHistory(roomId: string) {

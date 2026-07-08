@@ -48,13 +48,41 @@ export interface RecentlyPlayedItemDTO {
   playedAt: string;
 }
 
+export type ChatMessageKind = "USER" | "SYSTEM";
+
 export interface ChatMessageDTO {
   id: string;
   roomId: string;
-  sessionId: string;
+  /** Null for SYSTEM messages ("Alex joined", "Ben became host", ...). */
+  sessionId: string | null;
   displayName: string;
   content: string;
+  type: ChatMessageKind;
   createdAt: string;
+}
+
+export type RoomStatus = "ACTIVE" | "ENDED";
+export type QueueAddPermission = "ANYONE" | "HOST_ONLY";
+export type SkipMode = "ANYONE" | "HOST_ONLY" | "VOTE";
+
+export interface RoomSettingsDTO {
+  queueAddPermission: QueueAddPermission;
+  skipMode: SkipMode;
+  repeatQueue: boolean;
+  autoShuffle: boolean;
+  chatEnabled: boolean;
+  reactionsEnabled: boolean;
+  allowGuestReorder: boolean;
+  queueLocked: boolean;
+}
+
+export interface UpdateRoomSettingsRequest {
+  queueAddPermission?: QueueAddPermission;
+  skipMode?: SkipMode;
+  autoShuffle?: boolean;
+  chatEnabled?: boolean;
+  reactionsEnabled?: boolean;
+  allowGuestReorder?: boolean;
 }
 
 export interface RoomDTO {
@@ -63,6 +91,9 @@ export interface RoomDTO {
   name: string;
   repeatQueue: boolean;
   createdAt: string;
+  status: RoomStatus;
+  hostSessionId: string | null;
+  settings: RoomSettingsDTO;
   playbackState: PlaybackStateDTO | null;
   queue: QueueItemDTO[];
   onlineUsers: UserSessionDTO[];
@@ -128,3 +159,58 @@ export interface RecentlyPlayedResponse {
 export interface ChatHistoryResponse {
   messages: ChatMessageDTO[];
 }
+
+export type RoomEventKind =
+  | "JOINED"
+  | "LEFT"
+  | "HOST_TRANSFERRED"
+  | "QUEUE_LOCKED"
+  | "QUEUE_UNLOCKED"
+  | "VOTE_SKIP_PASSED"
+  | "ROOM_ENDED";
+
+export interface RoomEventDTO {
+  id: string;
+  roomId: string;
+  type: RoomEventKind;
+  actorName: string | null;
+  targetName: string | null;
+  /** Pre-rendered human-readable text ("Alex joined"), built server-side once so the client
+   *  doesn't need its own copy of the same type -> sentence mapping. */
+  summary: string;
+  createdAt: string;
+}
+
+/** Merged, time-sorted room history feed: structured events (joins/leaves/host transfers/...)
+ *  interleaved with songs played, so the UI can render one chronological list. */
+export type RoomHistoryEntryDTO =
+  | { kind: "event"; at: string; event: RoomEventDTO }
+  | { kind: "song"; at: string; song: RecentlyPlayedItemDTO };
+
+export interface RoomHistoryResponse {
+  entries: RoomHistoryEntryDTO[];
+}
+
+/** Ephemeral vote-to-skip state — not persisted, mirrors the in-memory state the server keeps
+ *  per room while a vote is active. */
+export interface VoteSkipStateDTO {
+  initiatorId: string;
+  initiatorName: string;
+  votes: string[];
+  required: number;
+  totalOnline: number;
+  expiresAt: string;
+}
+
+export type PresenceStatus = "online" | "away";
+export type PresenceActivity = "idle" | "typing_chat" | "adding_song" | "editing_queue";
+
+export interface PresenceStateDTO {
+  sessionId: string;
+  displayName: string;
+  status: PresenceStatus;
+  activity: PresenceActivity;
+}
+
+export const REACTION_EMOJIS = ["❤️", "🔥", "👏", "😂", "🎉"] as const;
+export type ReactionEmoji = (typeof REACTION_EMOJIS)[number];

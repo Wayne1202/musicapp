@@ -1,30 +1,28 @@
 "use client";
 
-import { useState } from "react";
-import { Check, Copy, Users, Wifi, WifiOff } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Users, Wifi, WifiOff } from "lucide-react";
+import type { RoomSettingsDTO } from "@musicapp/shared";
 import { Badge } from "@/components/ui/badge";
+import { RoomSettingsDialog } from "@/components/room/RoomSettingsDialog";
+import { InviteDialog } from "@/components/room/InviteDialog";
 
 export function RoomHeader({
+  roomId,
   roomName,
   roomCode,
   onlineCount,
   connected,
+  settings,
+  isHost,
 }: {
+  roomId: string;
   roomName: string;
   roomCode: string;
   onlineCount: number;
   connected: boolean;
+  settings: RoomSettingsDTO;
+  isHost: boolean;
 }) {
-  const [copied, setCopied] = useState(false);
-
-  const copyInviteLink = async () => {
-    const url = `${window.location.origin}/room/${roomCode}`;
-    await navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-
   return (
     <header className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
@@ -45,10 +43,8 @@ export function RoomHeader({
           <Users className="h-4 w-4" />
           Online ({onlineCount})
         </span>
-        <Button variant="outline" size="sm" onClick={copyInviteLink}>
-          {copied ? <Check className="mr-1.5 h-3.5 w-3.5" /> : <Copy className="mr-1.5 h-3.5 w-3.5" />}
-          {copied ? "Copied" : "Invite"}
-        </Button>
+        <InviteDialog roomCode={roomCode} roomName={roomName} />
+        <RoomSettingsDialog roomId={roomId} settings={settings} isHost={isHost} />
       </div>
     </header>
   );

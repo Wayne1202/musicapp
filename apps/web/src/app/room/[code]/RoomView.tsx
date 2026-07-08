@@ -3,11 +3,14 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { SocketEvents, canSkipInstantly } from "@musicapp/shared";
 import { getErrorMessage, getRoom, joinRoom } from "@/lib/api";
-import { getRoomSession, getStoredDisplayName, setRoomSession, storeDisplayName } from "@/lib/session";
+import { getRoomSession, getStoredDisplayName, setRoomSession, clearRoomSession, storeDisplayName } from "@/lib/session";
 import type { RoomSession } from "@/lib/session";
 import { useRoomSocket } from "@/hooks/useRoomSocket";
 import { usePlayerController } from "@/hooks/usePlayerController";
+import { usePlaybackActions } from "@/hooks/usePlaybackActions";
+import { getSocket } from "@/lib/socket";
 import { RoomHeader } from "@/components/room/RoomHeader";
 import { AddSongForm } from "@/components/room/AddSongForm";
 import { NowPlaying } from "@/components/room/NowPlaying";
@@ -16,6 +19,8 @@ import { BottomPlayerBar } from "@/components/room/BottomPlayerBar";
 import { Queue } from "@/components/room/Queue";
 import { OnlineUsers } from "@/components/room/OnlineUsers";
 import { ChatPanel } from "@/components/room/ChatPanel";
+import { VoteSkipBanner } from "@/components/room/VoteSkipBanner";
+import { ReactionLayer } from "@/components/room/ReactionLayer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,6 +46,11 @@ export function RoomView({ code }: { code: string }) {
   const live = useRoomSocket(session ? roomId : null, session?.sessionId ?? null);
   const playbackState = live.room?.playbackState ?? roomQuery.data?.room.playbackState ?? null;
   const controller = usePlayerController(roomId, playbackState);
+  const voteActions = usePlaybackActions(roomId);
+
+  useEffect(() => {
+    if (live.error) toast.error(live.error);
+  }, [live.error]);
 
   if (!checkedStorage || roomQuery.isLoading) {
     return <RoomSkeleton />;
@@ -60,31 +70,86 @@ export function RoomView({ code }: { code: string }) {
 
   const room = live.room ?? roomQuery.data.room;
 
+  if (live.roomEnded || room.status === "ENDED") {
+    clearRoomSession(code);
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-2 px-4 text-center">
+        <p className="text-lg font-semibold">This room has ended</p>
+        <p className="text-sm text-muted-foreground">The host closed &quot;{room.name}&quot;.</p>
+      </div>
+    );
+  }
+
+  const isHost = room.hostSessionId === session.sessionId;
+  const handleMakeHost = (targetSessionId: string) => {
+    getSocket().emit(SocketEvents.TRANSFER_HOST, { roomId: room.id, targetSessionId });
+  };
+
   return (
     <main className="mx-auto flex min-h-screen max-w-5xl flex-col gap-6 px-4 py-6 pb-20 sm:py-8 sm:pb-8">
       <RoomHeader
+        roomId={room.id}
         roomName={room.name}
         roomCode={room.code}
         onlineCount={room.onlineUsers.length}
         connected={live.connected}
+        settings={room.settings}
+        isHost={isHost}
       />
 
       <PlayerEngine controller={controller} />
 
-      <AddSongForm roomId={room.id} sessionId={session.sessionId} />
+      <AddSongForm
+        roomId={room.id}
+        sessionId={session.sessionId}
+        settings={room.settings}
+        hostSessionId={room.hostSessionId}
+      />
 
-      <NowPlaying playbackState={room.playbackState} controller={controller} />
+      <NowPlaying playbackState={room.playbackState} controller={controller} hostSessionId={room.hostSessionId} />
+
+      <ReactionLayer roomId={room.id} sessionId={session.sessionId} reactionsEnabled={room.settings.reactionsEnabled} />
+
+      <VoteSkipBanner
+        vote={live.vote}
+        sessionId={session.sessionId}
+        canSkipInstantly={canSkipInstantly({ hostSessionId: room.hostSessionId, ...room.settings }, session.sessionId)}
+        hasSong={Boolean(room.playbackState?.currentVideoId)}
+        onStartVote={voteActions.startVoteSkip}
+        onCastVote={voteActions.castVoteSkip}
+      />
 
       <div className="grid gap-6 sm:grid-cols-3">
         <div className="sm:col-span-2">
-          <Queue queue={room.queue} roomId={room.id} sessionId={session.sessionId} repeatQueue={room.repeatQueue} />
+          <Queue
+            queue={room.queue}
+            roomId={room.id}
+            sessionId={session.sessionId}
+            repeatQueue={room.repeatQueue}
+            settings={room.settings}
+            hostSessionId={room.hostSessionId}
+            presence={live.presence}
+          />
         </div>
         <div>
-          <OnlineUsers users={room.onlineUsers} currentSessionId={session.sessionId} typingUsers={live.typingUsers} />
+          <OnlineUsers
+            users={room.onlineUsers}
+            currentSessionId={session.sessionId}
+            hostSessionId={room.hostSessionId}
+            presence={live.presence}
+            onMakeHost={isHost ? handleMakeHost : undefined}
+          />
         </div>
       </div>
 
-      <ChatPanel roomId={room.id} sessionId={session.sessionId} liveMessages={live.messages} />
+      <ChatPanel
+        roomId={room.id}
+        sessionId={session.sessionId}
+        displayName={session.displayName}
+        onlineUsers={room.onlineUsers}
+        chatEnabled={room.settings.chatEnabled}
+        liveMessages={live.messages}
+      />
 
       <BottomPlayerBar playbackState={room.playbackState} controller={controller} />
     </main>

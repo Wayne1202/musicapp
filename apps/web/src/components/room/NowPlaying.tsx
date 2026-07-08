@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Pause, Play, SkipForward } from "lucide-react";
+import { Crown, Pause, Play, SkipForward } from "lucide-react";
 import type { PlaybackStateDTO } from "@musicapp/shared";
 import type { PlayerController } from "@/hooks/usePlayerController";
 import { Button } from "@/components/ui/button";
@@ -12,9 +12,10 @@ import { formatDuration } from "@/lib/utils";
 interface NowPlayingProps {
   playbackState: PlaybackStateDTO | null;
   controller: PlayerController;
+  hostSessionId?: string | null;
 }
 
-export function NowPlaying({ playbackState, controller }: NowPlayingProps) {
+export function NowPlaying({ playbackState, controller, hostSessionId }: NowPlayingProps) {
   const [artworkLoaded, setArtworkLoaded] = useState(false);
 
   // Fade the artwork in fresh on every song change instead of an instant swap.
@@ -62,7 +63,12 @@ export function NowPlaying({ playbackState, controller }: NowPlayingProps) {
               {playbackState?.currentTitle ?? "Nothing playing yet — add a song below"}
             </h2>
             {playbackState?.currentAddedByName && (
-              <p className="text-xs text-muted-foreground">Added by {playbackState.currentAddedByName}</p>
+              <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                Added by {playbackState.currentAddedByName}
+                {hostSessionId && playbackState.currentAddedById === hostSessionId && (
+                  <Crown className="h-3 w-3 text-amber-400" aria-label="Host" />
+                )}
+              </p>
             )}
           </div>
 

@@ -3,7 +3,7 @@
 import { useEffect, useReducer, useRef } from "react";
 import { toast } from "sonner";
 import { SocketEvents } from "@musicapp/shared";
-import type { ChatMessageDTO, RoomDTO } from "@musicapp/shared";
+import type { ChatMessageDTO, PresenceStateDTO, RoomDTO, VoteSkipStateDTO } from "@musicapp/shared";
 import { getSocket } from "@/lib/socket";
 
 interface RoomSocketState {
@@ -11,8 +11,10 @@ interface RoomSocketState {
   connected: boolean;
   error: string | null;
   messages: ChatMessageDTO[];
-  /** sessionId -> displayName, for users currently typing in the add-song box. */
-  typingUsers: Record<string, string>;
+  /** sessionId -> presence, for everyone currently in the room. */
+  presence: Record<string, PresenceStateDTO>;
+  roomEnded: boolean;
+  vote: VoteSkipStateDTO | null;
 }
 
 type Action =
@@ -22,7 +24,11 @@ type Action =
   | { type: "merge"; patch: Partial<RoomDTO> }
   | { type: "error"; message: string }
   | { type: "message_received"; message: ChatMessageDTO }
-  | { type: "typing"; sessionId: string; displayName: string; isTyping: boolean };
+  | { type: "presence_changed"; presence: PresenceStateDTO }
+  | { type: "presence_snapshot"; presence: PresenceStateDTO[] }
+  | { type: "room_ended" }
+  | { type: "vote_update"; vote: VoteSkipStateDTO }
+  | { type: "vote_resolved" };
 
 const HEARTBEAT_INTERVAL_MS = 25_000;
 
@@ -40,15 +46,19 @@ function reducer(state: RoomSocketState, action: Action): RoomSocketState {
       return { ...state, error: action.message };
     case "message_received":
       return { ...state, messages: [...state.messages, action.message] };
-    case "typing": {
-      const typingUsers = { ...state.typingUsers };
-      if (action.isTyping) {
-        typingUsers[action.sessionId] = action.displayName;
-      } else {
-        delete typingUsers[action.sessionId];
-      }
-      return { ...state, typingUsers };
+    case "presence_changed":
+      return { ...state, presence: { ...state.presence, [action.presence.sessionId]: action.presence } };
+    case "presence_snapshot": {
+      const presence: Record<string, PresenceStateDTO> = {};
+      for (const entry of action.presence) presence[entry.sessionId] = entry;
+      return { ...state, presence };
     }
+    case "room_ended":
+      return { ...state, roomEnded: true };
+    case "vote_update":
+      return { ...state, vote: action.vote };
+    case "vote_resolved":
+      return { ...state, vote: null };
     default:
       return state;
   }
@@ -65,7 +75,9 @@ export function useRoomSocket(roomId: string | null, sessionId: string | null) {
     connected: false,
     error: null,
     messages: [],
-    typingUsers: {},
+    presence: {},
+    roomEnded: false,
+    vote: null,
   });
   const joined = useRef(false);
   const heartbeatInterval = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -143,11 +155,25 @@ export function useRoomSocket(roomId: string | null, sessionId: string | null) {
     socket.on(SocketEvents.PLAYBACK_PAUSED, ({ playbackState }) => dispatch({ type: "merge", patch: { playbackState } }));
     socket.on(SocketEvents.PLAYBACK_SEEKED, ({ playbackState }) => dispatch({ type: "merge", patch: { playbackState } }));
 
-    socket.on(SocketEvents.USER_TYPING, ({ sessionId: typingSessionId, displayName, isTyping }) => {
-      dispatch({ type: "typing", sessionId: typingSessionId, displayName, isTyping });
-    });
+    socket.on(SocketEvents.PRESENCE_CHANGED, ({ presence }) => dispatch({ type: "presence_changed", presence }));
+    socket.on(SocketEvents.PRESENCE_SNAPSHOT, ({ presence }) => dispatch({ type: "presence_snapshot", presence }));
 
     socket.on(SocketEvents.MESSAGE_RECEIVED, ({ message }) => dispatch({ type: "message_received", message }));
+
+    socket.on(SocketEvents.HOST_CHANGED, ({ hostSessionId, hostName }) => {
+      dispatch({ type: "merge", patch: { hostSessionId } });
+      toast(`${hostName} is now the host`);
+    });
+
+    socket.on(SocketEvents.ROOM_ENDED, () => {
+      dispatch({ type: "room_ended" });
+    });
+
+    socket.on(SocketEvents.VOTE_SKIP_UPDATE, ({ vote }) => dispatch({ type: "vote_update", vote }));
+    socket.on(SocketEvents.VOTE_SKIP_RESOLVED, ({ passed }) => {
+      dispatch({ type: "vote_resolved" });
+      toast(passed ? "Vote passed — song skipped" : "Vote to skip didn't reach a majority");
+    });
 
     socket.on(SocketEvents.ERROR, ({ message }) => dispatch({ type: "error", message }));
 
@@ -170,8 +196,13 @@ export function useRoomSocket(roomId: string | null, sessionId: string | null) {
       socket.off(SocketEvents.PLAYBACK_STARTED);
       socket.off(SocketEvents.PLAYBACK_PAUSED);
       socket.off(SocketEvents.PLAYBACK_SEEKED);
-      socket.off(SocketEvents.USER_TYPING);
+      socket.off(SocketEvents.PRESENCE_CHANGED);
+      socket.off(SocketEvents.PRESENCE_SNAPSHOT);
       socket.off(SocketEvents.MESSAGE_RECEIVED);
+      socket.off(SocketEvents.HOST_CHANGED);
+      socket.off(SocketEvents.ROOM_ENDED);
+      socket.off(SocketEvents.VOTE_SKIP_UPDATE);
+      socket.off(SocketEvents.VOTE_SKIP_RESOLVED);
       socket.off(SocketEvents.ERROR);
       socket.disconnect();
       joined.current = false;

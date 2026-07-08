@@ -4,27 +4,44 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
-import { isValidYouTubeUrl } from "@musicapp/shared";
+import { canAddSong, isValidYouTubeUrl } from "@musicapp/shared";
+import type { RoomSettingsDTO } from "@musicapp/shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { addSong, getErrorMessage } from "@/lib/api";
-import { useTypingIndicator } from "@/hooks/useTypingIndicator";
+import { usePresence } from "@/hooks/usePresence";
 
-export function AddSongForm({ roomId, sessionId }: { roomId: string; sessionId: string }) {
+interface AddSongFormProps {
+  roomId: string;
+  sessionId: string;
+  settings: RoomSettingsDTO;
+  hostSessionId: string | null;
+}
+
+export function AddSongForm({ roomId, sessionId, settings, hostSessionId }: AddSongFormProps) {
   const [url, setUrl] = useState("");
-  const { notifyTyping, stopTyping } = useTypingIndicator(roomId);
+  const { notifyActivity, clearActivity } = usePresence(roomId);
+  const allowed = canAddSong({ hostSessionId, ...settings }, sessionId);
 
   const mutation = useMutation({
     mutationFn: (value: string) => addSong(roomId, sessionId, value),
     onSuccess: () => {
       setUrl("");
-      stopTyping();
+      clearActivity();
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });
 
   const trimmed = url.trim();
   const isValid = trimmed.length === 0 || isValidYouTubeUrl(trimmed);
+
+  if (!allowed) {
+    return (
+      <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+        {settings.queueLocked ? "The queue is locked — only the host can add songs right now." : "Only the host can add songs to this room right now."}
+      </div>
+    );
+  }
 
   return (
     <form
@@ -41,10 +58,10 @@ export function AddSongForm({ roomId, sessionId }: { roomId: string; sessionId: 
           value={url}
           onChange={(e) => {
             setUrl(e.target.value);
-            if (e.target.value.trim()) notifyTyping();
-            else stopTyping();
+            if (e.target.value.trim()) notifyActivity("adding_song");
+            else clearActivity();
           }}
-          onBlur={stopTyping}
+          onBlur={clearActivity}
           aria-invalid={!isValid}
           className="min-w-0 w-0 flex-1"
         />

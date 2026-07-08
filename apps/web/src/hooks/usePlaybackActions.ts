@@ -28,6 +28,14 @@ export function usePlaybackActions(roomId: string | null) {
         if (!roomId) return;
         socket.emit(SocketEvents.SONG_ENDED, { roomId });
       },
+      startVoteSkip: () => {
+        if (!roomId) return;
+        socket.emit(SocketEvents.VOTE_SKIP_START, { roomId });
+      },
+      castVoteSkip: () => {
+        if (!roomId) return;
+        socket.emit(SocketEvents.VOTE_SKIP_CAST, { roomId });
+      },
     };
   }, [roomId]);
 }

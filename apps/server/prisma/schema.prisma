@@ -7,19 +7,46 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum RoomStatus {
+  ACTIVE
+  ENDED
+}
+
+enum QueueAddPermission {
+  ANYONE
+  HOST_ONLY
+}
+
+enum SkipMode {
+  ANYONE
+  HOST_ONLY
+  VOTE
+}
+
 model Room {
-  id          String   @id @default(cuid())
-  code        String   @unique
+  id          String     @id @default(cuid())
+  code        String     @unique
   name        String
-  repeatQueue Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  repeatQueue Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  status             RoomStatus         @default(ACTIVE)
+  hostSessionId      String?
+  queueAddPermission QueueAddPermission @default(ANYONE)
+  skipMode           SkipMode           @default(ANYONE)
+  autoShuffle        Boolean            @default(false)
+  chatEnabled        Boolean            @default(true)
+  reactionsEnabled   Boolean            @default(true)
+  allowGuestReorder  Boolean            @default(true)
+  queueLocked        Boolean            @default(false)
 
   sessions       UserSession[]
   queueItems     QueueItem[]
   playbackState  PlaybackState?
   recentlyPlayed RecentlyPlayedItem[]
   chatMessages   ChatMessage[]
+  events         RoomEvent[]
 
   @@index([code])
 }
@@ -93,16 +120,45 @@ model RecentlyPlayedItem {
   @@index([roomId, playedAt])
 }
 
+enum ChatMessageType {
+  USER
+  SYSTEM
+}
+
 model ChatMessage {
-  id          String   @id @default(cuid())
+  id          String          @id @default(cuid())
   roomId      String
-  sessionId   String
+  sessionId   String?
   displayName String
   content     String
-  createdAt   DateTime @default(now())
+  type        ChatMessageType @default(USER)
+  createdAt   DateTime        @default(now())
 
-  room    Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  session UserSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  room    Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  session UserSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, createdAt])
+}
+
+enum RoomEventType {
+  JOINED
+  LEFT
+  HOST_TRANSFERRED
+  QUEUE_LOCKED
+  QUEUE_UNLOCKED
+  VOTE_SKIP_PASSED
+  ROOM_ENDED
+}
+
+model RoomEvent {
+  id         String        @id @default(cuid())
+  roomId     String
+  type       RoomEventType
+  actorName  String?
+  targetName String?
+  createdAt  DateTime      @default(now())
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
   @@index([roomId, createdAt])
 }

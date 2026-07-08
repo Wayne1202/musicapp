@@ -2,7 +2,7 @@ import type { PlaybackStateDTO } from "@musicapp/shared";
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../lib/http-error";
 import { serializePlaybackState } from "./serializers";
-import { popNextQueueItem } from "./queueService";
+import { popNextQueueItem, shuffleQueue } from "./queueService";
 import { recordPlayed } from "./recentlyPlayedService";
 
 /**
@@ -82,7 +82,7 @@ export async function advanceToNextSong(
   roomId: string,
 ): Promise<{ playbackState: PlaybackStateDTO; hasSong: boolean }> {
   const [room, outgoing] = await Promise.all([
-    prisma.room.findUnique({ where: { id: roomId }, select: { repeatQueue: true } }),
+    prisma.room.findUnique({ where: { id: roomId }, select: { repeatQueue: true, autoShuffle: true } }),
     prisma.playbackState.findUnique({ where: { roomId } }),
   ]);
 
@@ -99,6 +99,12 @@ export async function advanceToNextSong(
   }
 
   const next = await popNextQueueItem(roomId, { recycle: room?.repeatQueue ?? false });
+
+  // Auto-shuffle keeps repeat playback from settling into the same fixed rotation: reshuffle
+  // the remaining order every time a song gets recycled to the back of the queue.
+  if (room?.repeatQueue && room.autoShuffle) {
+    await shuffleQueue(roomId);
+  }
 
   const state = await prisma.playbackState.update({
     where: { roomId },
