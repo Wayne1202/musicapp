@@ -53,10 +53,17 @@ git push -u origin main
 
 1. Go to [neon.tech](https://neon.tech) and sign up / log in.
 2. Create a new project (any name/region is fine).
-3. On the project dashboard, find the **Connection string** — copy the one labeled "pooled
-   connection" (it works better for a server like this one that opens a connection per
-   request). It looks like `postgresql://user:password@host/dbname?sslmode=require`.
-4. Keep this tab open — you'll paste that string into Railway next.
+3. On the project dashboard, find the **Connection string** dropdown and copy **both**
+   variants — you need both, not just one:
+   - **Pooled connection** (host has `-pooler` in it) — this is `DATABASE_URL`, used for the
+     app's normal runtime queries.
+   - **Direct connection** (no `-pooler`) — this is `DIRECT_URL`, used only by
+     `prisma migrate deploy` when the container boots. Prisma's migration engine takes an
+     advisory lock that Neon's pooler (PgBouncer, transaction mode) doesn't support reliably —
+     pointing migrations at the pooled URL can make `migrate deploy` silently no-op (it reports
+     success without actually applying the migration) instead of failing loudly. If you skip
+     this and a migration ever seems to "not take" after a deploy, this is why.
+4. Keep this tab open — you'll paste both strings into Railway next.
 
 ### 3. Deploy the backend (Railway)
 
@@ -67,7 +74,8 @@ git push -u origin main
    it blank/as the repo root (the Dockerfile needs sibling access to `packages/shared`).
 4. Open the service's **Variables** tab and add (see `apps/server/.env.production.example`
    for the full list with explanations):
-   - `DATABASE_URL` — the Neon connection string from step 2.
+   - `DATABASE_URL` — the **pooled** Neon connection string from step 2.
+   - `DIRECT_URL` — the **direct** (non-pooled) Neon connection string from step 2.
    - `CLIENT_ORIGIN` — for now, put a placeholder like `https://placeholder.vercel.app`; you'll
      come back and fix this in step 5 once you know your real Vercel URL.
    - `YOUTUBE_API_KEY` — optional, leave blank to use the no-key fallback.
@@ -108,7 +116,8 @@ manual redeploy step needed for future changes.
 
 | App | Variable | Where it comes from |
 |---|---|---|
-| server | `DATABASE_URL` | Neon connection string |
+| server | `DATABASE_URL` | Neon **pooled** connection string (runtime queries) |
+| server | `DIRECT_URL` | Neon **direct** connection string (migrations only — see step 2) |
 | server | `PORT` | Set by Railway automatically in production |
 | server | `CLIENT_ORIGIN` | Your Vercel URL (comma-separate multiple origins) |
 | server | `YOUTUBE_API_KEY` | Optional, from Google Cloud Console |

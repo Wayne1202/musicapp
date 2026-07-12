@@ -4,7 +4,14 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // DATABASE_URL is Neon's pooled (PgBouncer) connection string, used for normal app queries.
+  // Migrations need DIRECT_URL (Neon's non-pooled connection string) instead: Prisma's migration
+  // engine takes an advisory lock that PgBouncer's transaction-pooling mode doesn't support
+  // reliably, which can make `prisma migrate deploy` silently no-op through the pooler even
+  // though it reports success. Falls back to DATABASE_URL if DIRECT_URL isn't set (e.g. local
+  // dev against a plain, unpooled Postgres, where there's no distinction to make).
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum RoomStatus {
