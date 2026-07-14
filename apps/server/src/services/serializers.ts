@@ -86,6 +86,7 @@ export function serializeRoom(room: RoomWithRelations): RoomDTO {
       reactionsEnabled: room.reactionsEnabled,
       allowGuestReorder: room.allowGuestReorder,
       queueLocked: room.queueLocked,
+      autoplayFallback: room.autoplayFallback,
     },
     playbackState: room.playbackState ? serializePlaybackState(room.playbackState) : null,
     queue: room.queueItems

@@ -130,6 +130,7 @@ export async function updateRoomSettings(
     chatEnabled: boolean;
     reactionsEnabled: boolean;
     allowGuestReorder: boolean;
+    autoplayFallback: boolean;
   }>,
 ): Promise<void> {
   await prisma.room.update({ where: { id: roomId }, data: patch });

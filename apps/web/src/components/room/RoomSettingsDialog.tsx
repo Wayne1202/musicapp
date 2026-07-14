@@ -100,6 +100,13 @@ export function RoomSettingsDialog({ roomId, settings, isHost }: RoomSettingsDia
             onToggle={() => update({ autoShuffle: !settings.autoShuffle })}
           />
           <ToggleRow
+            label="Play music when queue is empty"
+            description="Picks a random trending song instead of going idle. Needs a YouTube API key configured on the server."
+            enabled={settings.autoplayFallback}
+            disabled={!isHost}
+            onToggle={() => update({ autoplayFallback: !settings.autoplayFallback })}
+          />
+          <ToggleRow
             label="Enable chat"
             enabled={settings.chatEnabled}
             disabled={!isHost}

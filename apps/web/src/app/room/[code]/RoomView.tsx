@@ -148,6 +148,7 @@ export function RoomView({ code }: { code: string }) {
         displayName={session.displayName}
         onlineUsers={room.onlineUsers}
         chatEnabled={room.settings.chatEnabled}
+        presence={live.presence}
         liveMessages={live.messages}
       />
 

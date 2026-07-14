@@ -10,7 +10,11 @@ export function createHistoryRouter(): Router {
 
   router.get("/:roomId/recently-played", async (req, res, next) => {
     try {
-      const items = await getRecentlyPlayed(req.params.roomId);
+      // Quick-view modal defaults to the last 10; ?limit= lets other callers (e.g. the
+      // combined Room History feed) ask for more, up to whatever recentlyPlayedService retains.
+      const requested = Number(req.query.limit);
+      const limit = Number.isInteger(requested) && requested > 0 ? requested : 10;
+      const items = await getRecentlyPlayed(req.params.roomId, limit);
       res.json({ items } satisfies RecentlyPlayedResponse);
     } catch (err) {
       next(err);

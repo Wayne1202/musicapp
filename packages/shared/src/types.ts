@@ -74,6 +74,9 @@ export interface RoomSettingsDTO {
   reactionsEnabled: boolean;
   allowGuestReorder: boolean;
   queueLocked: boolean;
+  /** When the queue runs dry, play a random trending-music track instead of going idle.
+   *  No-ops server-side if YOUTUBE_API_KEY isn't configured. */
+  autoplayFallback: boolean;
 }
 
 export interface UpdateRoomSettingsRequest {
@@ -83,6 +86,7 @@ export interface UpdateRoomSettingsRequest {
   chatEnabled?: boolean;
   reactionsEnabled?: boolean;
   allowGuestReorder?: boolean;
+  autoplayFallback?: boolean;
 }
 
 export interface RoomDTO {

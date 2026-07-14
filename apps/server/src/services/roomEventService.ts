@@ -18,26 +18,30 @@ function buildMessage(type: RoomEventType, actorName: string | null, targetName:
     case "VOTE_SKIP_PASSED":
       return targetName ? `Vote passed — skipped "${targetName}"` : "Vote passed — song skipped";
     case "ROOM_ENDED":
-      return `${actorName ?? "The host"} ended the room`;
+      return actorName ? `${actorName} ended the room` : "Room ended automatically after sitting empty for an hour";
   }
 }
 
 /**
- * Records a durable room-history entry (persisted `RoomEvent` row) and mirrors it into the
- * chat stream as a `SYSTEM` message, so history and chat never have two separate copies of
- * the same "what happened" logic. Caller is responsible for broadcasting the returned message
- * over `MESSAGE_RECEIVED` (mirrors how every other chat-producing code path already works).
+ * Records a durable room-history entry (persisted `RoomEvent` row) and, by default, mirrors it
+ * into the chat stream as a `SYSTEM` message, so history and chat don't need two separate copies
+ * of the same "what happened" logic. Pass `postToChat: false` for events that are too frequent
+ * to show in chat (JOINED/LEFT fire on every reconnect, not just first entry) but still belong
+ * in the durable history log — Room History stays complete either way. Caller is responsible for
+ * broadcasting the returned message over `MESSAGE_RECEIVED` when one comes back (mirrors how
+ * every other chat-producing code path already works).
  */
 export async function recordRoomEvent(
   roomId: string,
   type: RoomEventType,
-  payload: { actorName?: string | null; targetName?: string | null } = {},
-): Promise<{ message: ChatMessageDTO }> {
+  payload: { actorName?: string | null; targetName?: string | null; postToChat?: boolean } = {},
+): Promise<{ message: ChatMessageDTO | null }> {
   const actorName = payload.actorName ?? null;
   const targetName = payload.targetName ?? null;
+  const postToChat = payload.postToChat ?? true;
 
   await prisma.roomEvent.create({ data: { roomId, type, actorName, targetName } });
-  const message = await sendSystemMessage(roomId, buildMessage(type, actorName, targetName));
+  const message = postToChat ? await sendSystemMessage(roomId, buildMessage(type, actorName, targetName)) : null;
   return { message };
 }
 

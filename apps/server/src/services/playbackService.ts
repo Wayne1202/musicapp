@@ -4,6 +4,7 @@ import { HttpError } from "../lib/http-error";
 import { serializePlaybackState } from "./serializers";
 import { popNextQueueItem, shuffleQueue } from "./queueService";
 import { recordPlayed } from "./recentlyPlayedService";
+import { pickRandomFallback } from "./fallbackPlaylistService";
 
 /**
  * Projects the stored playback state forward to "now". The DB only stores the timestamp
@@ -77,12 +78,16 @@ export async function seek(roomId: string, timestamp: number): Promise<PlaybackS
   return serializePlaybackState(state);
 }
 
-/** Advances to the next queued song. Returns the new playback state and whether a song was found. */
+/** Advances to the next queued song. Returns the new playback state, whether a song was found,
+ *  and whether that song came from the trending-music fallback pool rather than the real queue. */
 export async function advanceToNextSong(
   roomId: string,
-): Promise<{ playbackState: PlaybackStateDTO; hasSong: boolean }> {
+): Promise<{ playbackState: PlaybackStateDTO; hasSong: boolean; usedFallback: boolean }> {
   const [room, outgoing] = await Promise.all([
-    prisma.room.findUnique({ where: { id: roomId }, select: { repeatQueue: true, autoShuffle: true } }),
+    prisma.room.findUnique({
+      where: { id: roomId },
+      select: { repeatQueue: true, autoShuffle: true, autoplayFallback: true },
+    }),
     prisma.playbackState.findUnique({ where: { roomId } }),
   ]);
 
@@ -106,18 +111,35 @@ export async function advanceToNextSong(
     await shuffleQueue(roomId);
   }
 
+  // Real queue is source of truth; only reach for a fallback song when it's genuinely empty.
+  // Fallback songs have no attribution (currentAddedById/Name stay null) since nobody queued
+  // them — NowPlaying's "Added by" line already hides itself when that's null.
+  let songToPlay: { videoId: string; title: string; thumbnail: string; duration: number; addedById: string | null; addedByName: string | null } | null =
+    next
+      ? { videoId: next.videoId, title: next.title, thumbnail: next.thumbnail, duration: next.duration, addedById: next.addedById, addedByName: next.addedByName }
+      : null;
+
+  let usedFallback = false;
+  if (!songToPlay && room?.autoplayFallback) {
+    const fallback = await pickRandomFallback(outgoing?.currentVideoId);
+    if (fallback) {
+      songToPlay = { ...fallback, addedById: null, addedByName: null };
+      usedFallback = true;
+    }
+  }
+
   const state = await prisma.playbackState.update({
     where: { roomId },
-    data: next
+    data: songToPlay
       ? {
-          currentVideoId: next.videoId,
-          currentTitle: next.title,
-          currentThumbnail: next.thumbnail,
-          currentDuration: next.duration,
+          currentVideoId: songToPlay.videoId,
+          currentTitle: songToPlay.title,
+          currentThumbnail: songToPlay.thumbnail,
+          currentDuration: songToPlay.duration,
           currentTimestamp: 0,
           isPlaying: true,
-          currentAddedById: next.addedById,
-          currentAddedByName: next.addedByName,
+          currentAddedById: songToPlay.addedById,
+          currentAddedByName: songToPlay.addedByName,
         }
       : {
           currentVideoId: null,
@@ -131,5 +153,5 @@ export async function advanceToNextSong(
         },
   });
 
-  return { playbackState: serializePlaybackState(state), hasSong: Boolean(next) };
+  return { playbackState: serializePlaybackState(state), hasSong: Boolean(songToPlay), usedFallback };
 }

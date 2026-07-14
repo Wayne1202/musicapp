@@ -47,6 +47,7 @@ model Room {
   reactionsEnabled   Boolean            @default(true)
   allowGuestReorder  Boolean            @default(true)
   queueLocked        Boolean            @default(false)
+  autoplayFallback   Boolean            @default(true)
 
   sessions       UserSession[]
   queueItems     QueueItem[]

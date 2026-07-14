@@ -13,8 +13,9 @@ function initials(name: string): string {
     .join("");
 }
 
+// "typing_chat" is deliberately omitted here — that indicator now lives in ChatPanel itself
+// (next to the messages it's about), not the online-users list.
 const ACTIVITY_LABEL: Record<string, string> = {
-  typing_chat: "typing in chat…",
   adding_song: "adding a song…",
   editing_queue: "editing the queue…",
 };

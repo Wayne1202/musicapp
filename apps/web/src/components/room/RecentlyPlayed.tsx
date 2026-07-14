@@ -17,7 +17,7 @@ export function RecentlyPlayed({ roomId }: { roomId: string }) {
   // split-second live updates, so keeping this a plain fetch-on-open keeps the feature simple.
   const query = useQuery({
     queryKey: ["recently-played", roomId],
-    queryFn: () => getRecentlyPlayed(roomId),
+    queryFn: () => getRecentlyPlayed(roomId, 10),
     enabled: open,
   });
 
@@ -32,7 +32,7 @@ export function RecentlyPlayed({ roomId }: { roomId: string }) {
       </DialogTrigger>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Recently played</DialogTitle>
+          <DialogTitle>Last 10 played</DialogTitle>
         </DialogHeader>
 
         {query.isLoading ? (

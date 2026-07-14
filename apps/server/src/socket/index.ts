@@ -92,6 +92,45 @@ function shouldAdvance(roomId: string): boolean {
   return true;
 }
 
+// Auto-ends a room that's sat with zero online users for this long, instead of leaving
+// abandoned rooms ACTIVE forever. In-memory, same tier as every other per-room timer in this
+// file — resets on a server restart, an accepted trade-off given the single-instance
+// deployment (see CLAUDE.md). Scheduled when the last person disconnects, cancelled the moment
+// anyone (re)joins.
+const AUTO_END_EMPTY_ROOM_MS = 60 * 60 * 1000; // 1 hour
+const roomEmptyTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+
+function cancelAutoEnd(roomId: string) {
+  const timeout = roomEmptyTimeouts.get(roomId);
+  if (timeout) {
+    clearTimeout(timeout);
+    roomEmptyTimeouts.delete(roomId);
+  }
+}
+
+function scheduleAutoEnd(io: TypedServer, roomId: string) {
+  cancelAutoEnd(roomId);
+  roomEmptyTimeouts.set(
+    roomId,
+    setTimeout(async () => {
+      roomEmptyTimeouts.delete(roomId);
+      try {
+        // Re-check on fire — someone may have rejoined without cancelAutoEnd racing ahead of
+        // this callback, or the room may have already been ended some other way.
+        const [room, onlineUsers] = await Promise.all([getRoomRecord(roomId), getOnlineUsers(roomId)]);
+        if (room.status !== "ACTIVE" || onlineUsers.length > 0) return;
+
+        await endRoom(roomId);
+        const { message } = await recordRoomEvent(roomId, "ROOM_ENDED", {});
+        if (message) io.to(roomId).emit(SocketEvents.MESSAGE_RECEIVED, { message });
+        io.to(roomId).emit(SocketEvents.ROOM_ENDED, { roomId });
+      } catch (err) {
+        logger.error("socket", "auto-end empty room failed", err);
+      }
+    }, AUTO_END_EMPTY_ROOM_MS),
+  );
+}
+
 // Ephemeral vote-to-skip state, one active vote per room at a time — same in-memory tier as
 // presence/advance-debounce above (acceptable given the single-instance deployment, see
 // CLAUDE.md). `timeout` auto-resolves the vote as failed if it never reaches a majority.
@@ -139,6 +178,7 @@ export function registerSocketHandlers(io: TypedServer) {
         // Reconnect path: if the room currently has no host (e.g. everyone had left), this
         // joiner claims it. New-room-creation and join-by-code already set a host directly.
         await becomeHostIfNone(payload.roomId, payload.sessionId);
+        cancelAutoEnd(payload.roomId);
 
         const room = await getRoomDTOById(payload.roomId);
         socket.emit(SocketEvents.ROOM_STATE, { room });
@@ -159,8 +199,10 @@ export function registerSocketHandlers(io: TypedServer) {
           onlineUsers,
         });
 
-        const { message } = await recordRoomEvent(payload.roomId, "JOINED", { actorName: session.displayName });
-        io.to(payload.roomId).emit(SocketEvents.MESSAGE_RECEIVED, { message });
+        // Recorded for Room History but not mirrored into chat — join/leave on every
+        // reconnect (page refresh, tab reopen) made the chat stream unusably noisy; the
+        // existing USER_JOINED toast already covers this moment for anyone watching live.
+        await recordRoomEvent(payload.roomId, "JOINED", { actorName: session.displayName, postToChat: false });
       } catch (err) {
         logger.error("socket", "join_room failed", err);
         socket.emit(SocketEvents.ERROR, { message: "Failed to join room" });
@@ -202,9 +244,13 @@ export function registerSocketHandlers(io: TypedServer) {
     });
 
     const advanceQueue = async (roomId: string) => {
-      const { playbackState } = await advanceToNextSong(roomId);
+      const { playbackState, usedFallback } = await advanceToNextSong(roomId);
       const queue = await getQueue(roomId);
       io.to(roomId).emit(SocketEvents.SONG_CHANGED, { playbackState, queue });
+      if (usedFallback) {
+        const message = await sendSystemMessage(roomId, "Queue's empty — playing something while you add more 🎲");
+        io.to(roomId).emit(SocketEvents.MESSAGE_RECEIVED, { message });
+      }
     };
 
     const resolveVote = async (roomId: string, passed: boolean) => {
@@ -219,7 +265,7 @@ export function registerSocketHandlers(io: TypedServer) {
         const { message } = await recordRoomEvent(roomId, "VOTE_SKIP_PASSED", {
           targetName: outgoing.currentTitle ?? undefined,
         });
-        io.to(roomId).emit(SocketEvents.MESSAGE_RECEIVED, { message });
+        if (message) io.to(roomId).emit(SocketEvents.MESSAGE_RECEIVED, { message });
       } else {
         const message = await sendSystemMessage(roomId, "Vote to skip didn't reach a majority");
         io.to(roomId).emit(SocketEvents.MESSAGE_RECEIVED, { message });
@@ -331,7 +377,7 @@ export function registerSocketHandlers(io: TypedServer) {
         const { message } = await recordRoomEvent(payload.roomId, "HOST_TRANSFERRED", {
           targetName: newHost.displayName,
         });
-        io.to(payload.roomId).emit(SocketEvents.MESSAGE_RECEIVED, { message });
+        if (message) io.to(payload.roomId).emit(SocketEvents.MESSAGE_RECEIVED, { message });
       } catch (err) {
         const errMessage = err instanceof Error ? err.message : "Failed to transfer host";
         if (!(err instanceof HttpError)) logger.error("socket", "transfer_host failed", err);
@@ -350,7 +396,7 @@ export function registerSocketHandlers(io: TypedServer) {
         }
         await endRoom(payload.roomId);
         const { message } = await recordRoomEvent(payload.roomId, "ROOM_ENDED", { actorName: displayName });
-        io.to(payload.roomId).emit(SocketEvents.MESSAGE_RECEIVED, { message });
+        if (message) io.to(payload.roomId).emit(SocketEvents.MESSAGE_RECEIVED, { message });
         io.to(payload.roomId).emit(SocketEvents.ROOM_ENDED, { roomId: payload.roomId });
       } catch (err) {
         const errMessage = err instanceof Error ? err.message : "Failed to end room";
@@ -394,7 +440,7 @@ export function registerSocketHandlers(io: TypedServer) {
         const { message } = await recordRoomEvent(payload.roomId, payload.locked ? "QUEUE_LOCKED" : "QUEUE_UNLOCKED", {
           actorName: displayName,
         });
-        io.to(payload.roomId).emit(SocketEvents.MESSAGE_RECEIVED, { message });
+        if (message) io.to(payload.roomId).emit(SocketEvents.MESSAGE_RECEIVED, { message });
       } catch (err) {
         const errMessage = err instanceof Error ? err.message : "Failed to update the queue lock";
         if (!(err instanceof HttpError)) logger.error("socket", "set_queue_lock failed", err);
@@ -498,6 +544,7 @@ export function registerSocketHandlers(io: TypedServer) {
         clearPresence(roomId, sessionId);
         const onlineUsers = await getOnlineUsers(roomId);
         io.to(roomId).emit(SocketEvents.USER_LEFT, { sessionId, onlineUsers });
+        if (onlineUsers.length === 0) scheduleAutoEnd(io, roomId);
 
         const activeVote = voteSkipByRoom.get(roomId);
         if (activeVote) {
@@ -512,10 +559,8 @@ export function registerSocketHandlers(io: TypedServer) {
           }
         }
 
-        const { message: leftMessage } = await recordRoomEvent(roomId, "LEFT", {
-          actorName: socket.data.displayName,
-        });
-        io.to(roomId).emit(SocketEvents.MESSAGE_RECEIVED, { message: leftMessage });
+        // Recorded for Room History but not mirrored into chat — same reasoning as JOINED above.
+        await recordRoomEvent(roomId, "LEFT", { actorName: socket.data.displayName, postToChat: false });
 
         const newHost = await reassignHostOnDisconnect(roomId, sessionId, onlineUsers);
         if (newHost) {
@@ -523,7 +568,7 @@ export function registerSocketHandlers(io: TypedServer) {
           const { message: hostMessage } = await recordRoomEvent(roomId, "HOST_TRANSFERRED", {
             targetName: newHost.displayName,
           });
-          io.to(roomId).emit(SocketEvents.MESSAGE_RECEIVED, { message: hostMessage });
+          if (hostMessage) io.to(roomId).emit(SocketEvents.MESSAGE_RECEIVED, { message: hostMessage });
         }
       } catch (err) {
         logger.error("socket", "disconnect handling failed", err);

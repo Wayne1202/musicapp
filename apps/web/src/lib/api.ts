@@ -112,8 +112,9 @@ export function setRepeatQueue(roomId: string, sessionId: string, enabled: boole
   });
 }
 
-export function getRecentlyPlayed(roomId: string) {
-  return request<RecentlyPlayedResponse>(`/api/rooms/${roomId}/recently-played`);
+export function getRecentlyPlayed(roomId: string, limit?: number) {
+  const query = limit ? `?limit=${limit}` : "";
+  return request<RecentlyPlayedResponse>(`/api/rooms/${roomId}/recently-played${query}`);
 }
 
 export function getRoomHistory(roomId: string) {

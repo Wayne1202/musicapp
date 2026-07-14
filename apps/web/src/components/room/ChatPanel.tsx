@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { MessageCircle, Send } from "lucide-react";
 import { toast } from "sonner";
 import { SocketEvents } from "@musicapp/shared";
-import type { ChatMessageDTO, UserSessionDTO } from "@musicapp/shared";
+import type { ChatMessageDTO, PresenceStateDTO, UserSessionDTO } from "@musicapp/shared";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,9 +27,18 @@ interface ChatPanelProps {
   displayName: string;
   onlineUsers: UserSessionDTO[];
   chatEnabled: boolean;
+  presence?: Record<string, PresenceStateDTO>;
   /** New messages received live over the socket since this component mounted (owned by
    *  useRoomSocket, the single place all room socket events are consumed). */
   liveMessages: ChatMessageDTO[];
+}
+
+/** "Alex is typing…" / "Alex and Ben are typing…" / "Alex, Ben and 2 others are typing…" */
+function formatTypingLabel(names: string[]): string {
+  if (names.length === 1) return `${names[0]} is typing…`;
+  if (names.length === 2) return `${names[0]} and ${names[1]} are typing…`;
+  if (names.length === 3) return `${names[0]}, ${names[1]} and ${names[2]} are typing…`;
+  return `${names[0]}, ${names[1]} and ${names.length - 2} others are typing…`;
 }
 
 /** Wraps `@Name` substrings (matched against known display names, longest-first so e.g. "Alex"
@@ -54,7 +63,15 @@ function renderWithMentions(content: string, knownNames: string[]) {
   return parts;
 }
 
-export function ChatPanel({ roomId, sessionId, displayName, onlineUsers, chatEnabled, liveMessages }: ChatPanelProps) {
+export function ChatPanel({
+  roomId,
+  sessionId,
+  displayName,
+  onlineUsers,
+  chatEnabled,
+  presence = {},
+  liveMessages,
+}: ChatPanelProps) {
   const [draft, setDraft] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const { notifyActivity, clearActivity } = usePresence(roomId);
@@ -96,6 +113,10 @@ export function ChatPanel({ roomId, sessionId, displayName, onlineUsers, chatEna
       }
     }
   }, [liveMessages, sessionId, displayName]);
+
+  const typingNames = Object.values(presence)
+    .filter((p) => p.activity === "typing_chat" && p.sessionId !== sessionId)
+    .map((p) => p.displayName);
 
   const mentionQuery = /@(\w*)$/.exec(draft)?.[1];
   const mentionMatches =
@@ -176,6 +197,10 @@ export function ChatPanel({ roomId, sessionId, displayName, onlineUsers, chatEna
             </ol>
           )}
         </ScrollArea>
+      )}
+
+      {typingNames.length > 0 && (
+        <p className="truncate text-xs italic text-muted-foreground">{formatTypingLabel(typingNames)}</p>
       )}
 
       <form
