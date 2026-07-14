@@ -2,7 +2,7 @@ import { extractYouTubeVideoId } from "@musicapp/shared";
 import type { QueueItemDTO } from "@musicapp/shared";
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../lib/http-error";
-import { fetchYouTubeMetadata } from "./youtubeMetadata";
+import { fetchYouTubeMetadata } from "./youtube/videos";
 import { serializeQueueItem } from "./serializers";
 import { startPlaybackIfIdle } from "./playbackService";
 
@@ -16,20 +16,18 @@ export async function getQueue(roomId: string): Promise<QueueItemDTO[]> {
 }
 
 /**
- * Adds a song from a pasted YouTube URL. If nothing is currently playing in the room,
- * the song starts playing immediately instead of sitting in the queue.
+ * Shared core for both ways a song gets added — pasted URL or picked from search — so neither
+ * path has its own copy of the duplicate-checks/insert/immediate-play logic. `metadataHint`
+ * lets the search path skip a redundant Data API call: search results already carry
+ * title/thumbnail/duration, no need to look them up again.
  */
-export async function addSongFromUrl(
+async function addResolvedSong(
   roomId: string,
   sessionId: string,
   displayName: string,
-  url: string,
+  videoId: string,
+  metadataHint?: { title: string; thumbnail: string; duration: number },
 ): Promise<{ queueItem: QueueItemDTO | null; startedImmediately: boolean }> {
-  const videoId = extractYouTubeVideoId(url);
-  if (!videoId) {
-    throw new HttpError(400, "Could not extract a YouTube video ID from that URL");
-  }
-
   const playbackState = await prisma.playbackState.findUnique({ where: { roomId } });
   if (playbackState?.currentVideoId === videoId) {
     throw new HttpError(409, "That song is already playing");
@@ -40,13 +38,13 @@ export async function addSongFromUrl(
     throw new HttpError(409, "That song is already in the queue");
   }
 
-  const metadata = await fetchYouTubeMetadata(videoId);
+  const metadata = metadataHint ?? (await fetchYouTubeMetadata(videoId));
 
   const nothingPlaying = !playbackState?.currentVideoId;
 
   if (nothingPlaying) {
     await startPlaybackIfIdle(roomId, {
-      videoId: metadata.videoId,
+      videoId,
       title: metadata.title,
       thumbnail: metadata.thumbnail,
       duration: metadata.duration,
@@ -66,7 +64,7 @@ export async function addSongFromUrl(
     data: {
       roomId,
       addedById: sessionId,
-      videoId: metadata.videoId,
+      videoId,
       title: metadata.title,
       thumbnail: metadata.thumbnail,
       duration: metadata.duration,
@@ -76,6 +74,36 @@ export async function addSongFromUrl(
   });
 
   return { queueItem: serializeQueueItem(created), startedImmediately: false };
+}
+
+/**
+ * Adds a song from a pasted YouTube URL. If nothing is currently playing in the room,
+ * the song starts playing immediately instead of sitting in the queue.
+ */
+export async function addSongFromUrl(
+  roomId: string,
+  sessionId: string,
+  displayName: string,
+  url: string,
+): Promise<{ queueItem: QueueItemDTO | null; startedImmediately: boolean }> {
+  const videoId = extractYouTubeVideoId(url);
+  if (!videoId) {
+    throw new HttpError(400, "Could not extract a YouTube video ID from that URL");
+  }
+  return addResolvedSong(roomId, sessionId, displayName, videoId);
+}
+
+/** Adds a song picked from search results — same rules as addSongFromUrl (duplicate checks,
+ *  immediate-play-if-idle, permissions already checked by the caller), just skipping the URL
+ *  parse and, if metadata is provided, the metadata fetch too. */
+export async function addSongByVideoId(
+  roomId: string,
+  sessionId: string,
+  displayName: string,
+  videoId: string,
+  metadataHint?: { title: string; thumbnail: string; duration: number },
+): Promise<{ queueItem: QueueItemDTO | null; startedImmediately: boolean }> {
+  return addResolvedSong(roomId, sessionId, displayName, videoId, metadataHint);
 }
 
 /**

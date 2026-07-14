@@ -1,7 +1,7 @@
 import { buildYouTubeThumbnailUrl, parseIso8601Duration } from "@musicapp/shared";
-import { env } from "../lib/env";
-import { HttpError } from "../lib/http-error";
-import { logger } from "../lib/logger";
+import { env } from "../../lib/env";
+import { HttpError } from "../../lib/http-error";
+import { logger } from "../../lib/logger";
 
 export interface YouTubeVideoMetadata {
   videoId: string;
@@ -11,8 +11,9 @@ export interface YouTubeVideoMetadata {
   duration: number;
 }
 
-interface DataApiResponse {
+interface DataApiVideosResponse {
   items: Array<{
+    id: string;
     snippet: { title: string; thumbnails: Record<string, { url: string }> };
     contentDetails: { duration: string };
   }>;
@@ -49,20 +50,28 @@ async function fetchViaDataApi(videoId: string, apiKey: string): Promise<YouTube
   if (!res.ok) {
     throw new Error(`YouTube Data API error: ${res.status}`);
   }
-  const data = (await res.json()) as DataApiResponse;
+  const data = (await res.json()) as DataApiVideosResponse;
   const item = data.items?.[0];
   if (!item) {
     throw new HttpError(404, "Video not found or unavailable");
   }
 
+  return { videoId, ...mapSnippetAndDuration(item) };
+}
+
+/** Shared by videos.ts's single-video lookup and search.ts's duration-batching call. */
+export function mapSnippetAndDuration(item: {
+  id: string;
+  snippet: { title: string; thumbnails: Record<string, { url: string }> };
+  contentDetails: { duration: string };
+}): Omit<YouTubeVideoMetadata, "videoId"> {
   const thumbnail =
     item.snippet.thumbnails?.high?.url ??
     item.snippet.thumbnails?.medium?.url ??
     item.snippet.thumbnails?.default?.url ??
-    buildYouTubeThumbnailUrl(videoId);
+    buildYouTubeThumbnailUrl(item.id);
 
   return {
-    videoId,
     title: item.snippet.title,
     thumbnail,
     duration: parseIso8601Duration(item.contentDetails.duration),

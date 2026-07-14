@@ -122,13 +122,33 @@ export interface JoinRoomResponse {
   session: UserSessionDTO;
 }
 
+/** Exactly one of `url` / `videoId` must be present. `videoId` is the search-result path —
+ *  title/thumbnail/duration are already known from the search response, passed along as a hint
+ *  so the server doesn't need to re-fetch metadata it was just given. */
 export interface AddSongRequest {
-  url: string;
+  url?: string;
+  videoId?: string;
+  title?: string;
+  thumbnail?: string;
+  duration?: number;
 }
 
 export interface AddSongResponse {
   /** Null when the song started playing immediately instead of being queued (nothing was playing). */
   queueItem: QueueItemDTO | null;
+}
+
+export interface SearchResultDTO {
+  videoId: string;
+  title: string;
+  channelTitle: string;
+  thumbnail: string;
+  /** Duration in seconds. */
+  duration: number;
+}
+
+export interface SearchSongsResponse {
+  results: SearchResultDTO[];
 }
 
 export interface MoveQueueItemRequest {

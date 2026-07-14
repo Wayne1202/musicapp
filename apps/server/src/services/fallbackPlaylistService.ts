@@ -1,6 +1,7 @@
-import { buildYouTubeThumbnailUrl, parseIso8601Duration } from "@musicapp/shared";
 import { env } from "../lib/env";
 import { logger } from "../lib/logger";
+import { InMemoryCache } from "./youtube/cache";
+import { mapSnippetAndDuration } from "./youtube/videos";
 
 export interface FallbackVideo {
   videoId: string;
@@ -20,8 +21,12 @@ interface ChartResponse {
 const MUSIC_CATEGORY_ID = "10";
 const REGION_CODE = "US";
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours — trending charts don't move fast enough to need more
+const CACHE_KEY = "trending-music";
 
-let cache: { videos: FallbackVideo[]; fetchedAt: number } | null = null;
+const cache = new InMemoryCache<FallbackVideo[]>();
+// Survives past the cache entry's own expiry, unlike `cache` above — lets a transient fetch
+// failure fall back to the last good list instead of going empty (see the catch block below).
+let lastKnownGood: FallbackVideo[] | null = null;
 
 /**
  * Rotating pool of currently-trending YouTube music videos, used to keep a room playing
@@ -33,7 +38,9 @@ let cache: { videos: FallbackVideo[]; fetchedAt: number } | null = null;
  */
 export async function getFallbackVideos(): Promise<FallbackVideo[]> {
   if (!env.youtubeApiKey) return [];
-  if (cache && Date.now() - cache.fetchedAt < CACHE_TTL_MS) return cache.videos;
+
+  const cached = cache.get(CACHE_KEY);
+  if (cached) return cached;
 
   try {
     const url = new URL("https://www.googleapis.com/youtube/v3/videos");
@@ -50,22 +57,17 @@ export async function getFallbackVideos(): Promise<FallbackVideo[]> {
 
     const videos: FallbackVideo[] = data.items.map((item) => ({
       videoId: item.id,
-      title: item.snippet.title,
-      thumbnail:
-        item.snippet.thumbnails?.high?.url ??
-        item.snippet.thumbnails?.medium?.url ??
-        item.snippet.thumbnails?.default?.url ??
-        buildYouTubeThumbnailUrl(item.id),
-      duration: parseIso8601Duration(item.contentDetails.duration),
+      ...mapSnippetAndDuration(item),
     }));
 
-    cache = { videos, fetchedAt: Date.now() };
+    cache.set(CACHE_KEY, videos, CACHE_TTL_MS);
+    lastKnownGood = videos;
     return videos;
   } catch (err) {
     logger.warn("fallback-playlist", "Failed to refresh trending-music chart", err);
-    // Keep serving the last good cache (even if stale) rather than going empty on a transient
-    // fetch failure; only a truly empty/never-fetched cache falls through to [].
-    return cache?.videos ?? [];
+    // Keep serving the last good list (even if stale) rather than going empty on a transient
+    // fetch failure; only a truly empty/never-fetched list falls through to [].
+    return lastKnownGood ?? [];
   }
 }
 

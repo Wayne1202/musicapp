@@ -9,6 +9,8 @@ import type {
   RecentlyPlayedResponse,
   RoomDTO,
   RoomHistoryResponse,
+  SearchResultDTO,
+  SearchSongsResponse,
 } from "@musicapp/shared";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -64,6 +66,25 @@ export function addSong(roomId: string, sessionId: string, url: string) {
     method: "POST",
     headers: { "x-session-id": sessionId },
     body: JSON.stringify({ url }),
+  });
+}
+
+export function addSongByVideoId(roomId: string, sessionId: string, result: SearchResultDTO) {
+  return request<AddSongResponse>(`/api/rooms/${roomId}/queue`, {
+    method: "POST",
+    headers: { "x-session-id": sessionId },
+    body: JSON.stringify({
+      videoId: result.videoId,
+      title: result.title,
+      thumbnail: result.thumbnail,
+      duration: result.duration,
+    }),
+  });
+}
+
+export function searchSongs(roomId: string, sessionId: string, query: string) {
+  return request<SearchSongsResponse>(`/api/rooms/${roomId}/search?q=${encodeURIComponent(query)}`, {
+    headers: { "x-session-id": sessionId },
   });
 }
 

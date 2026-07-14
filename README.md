@@ -28,6 +28,25 @@ Open http://localhost:3000. `docker-compose.yml` at the repo root will start a l
 for you (`docker compose up -d`) if you don't already have one running — just make sure the
 `DATABASE_URL` in `apps/server/.env` matches it.
 
+### Getting a YouTube Data API key
+
+The app runs without one (adding songs by URL still works via YouTube's public oEmbed
+endpoint), but in-app song **search** specifically needs a real key — there's no keyless search
+API. Free to set up:
+
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/), create a project (or
+   use an existing one).
+2. **APIs & Services -> Library**, search for "YouTube Data API v3", click **Enable**.
+3. **APIs & Services -> Credentials -> Create Credentials -> API key**. Copy it.
+4. (Recommended) Click into the new key and under **API restrictions**, restrict it to just
+   "YouTube Data API v3" — since this key is only ever used server-side, an IP restriction to
+   your Railway service's outbound IP is possible too, but not required.
+5. Paste it into `YOUTUBE_API_KEY` in `apps/server/.env` (local) or Railway's Variables tab
+   (production — see step 3 below).
+
+The free tier is 10,000 quota units/day; search costs 101 units per *uncached* query (see
+"Limitations" below), metadata lookups cost 1.
+
 ## Deploying to production
 
 This app deploys as three separate pieces: the database (Neon), the backend (Railway), and the
@@ -78,7 +97,9 @@ git push -u origin main
    - `DIRECT_URL` — the **direct** (non-pooled) Neon connection string from step 2.
    - `CLIENT_ORIGIN` — for now, put a placeholder like `https://placeholder.vercel.app`; you'll
      come back and fix this in step 5 once you know your real Vercel URL.
-   - `YOUTUBE_API_KEY` — optional, leave blank to use the no-key fallback.
+   - `YOUTUBE_API_KEY` — recommended, needed for in-app song search (see "Getting a YouTube
+     Data API key" above); leave blank to skip it, search just prompts users to paste a link
+     instead and the rest of the app is unaffected.
 5. Open **Settings -> Networking -> Generate Domain** to get a public URL, something like
    `https://musicapp-production.up.railway.app`. Copy it.
 6. Wait for the deploy to finish, then visit `<that-url>/health` — you should see `{"ok":true}`.
@@ -120,6 +141,21 @@ manual redeploy step needed for future changes.
 | server | `DIRECT_URL` | Neon **direct** connection string (migrations only — see step 2) |
 | server | `PORT` | Set by Railway automatically in production |
 | server | `CLIENT_ORIGIN` | Your Vercel URL (comma-separate multiple origins) |
-| server | `YOUTUBE_API_KEY` | Optional, from Google Cloud Console |
+| server | `YOUTUBE_API_KEY` | Recommended (required for search), from Google Cloud Console — see "Getting a YouTube Data API key" above |
 | web | `NEXT_PUBLIC_API_URL` | Your Railway URL |
 | web | `NEXT_PUBLIC_SOCKET_URL` | Your Railway URL (same as above) |
+
+## Limitations
+
+- **Search quota**: `search.list` costs 100 quota units per call against YouTube's default
+  10,000/day project quota (vs. 1 unit for a metadata lookup). Search results are cached
+  server-side by query text for ~1 hour, which absorbs repeat/popular queries, but a busy
+  multi-room deployment could still burn quota faster than metadata lookups alone ever did —
+  worth an eye on usage in Google Cloud Console if it grows. Adding by pasted URL is unaffected
+  either way (1 unit, or free via the oEmbed fallback with no key at all).
+- **In-memory caches are per-process**: search results, the trending "autoplay when queue is
+  empty" pool, and presence/vote state all live in server memory and reset on redeploy/restart.
+  Fine for today's single-instance deployment; horizontally scaling this app would need a shared
+  cache (Redis) instead — the search cache is deliberately built behind a small `Cache<T>`
+  interface (`apps/server/src/services/youtube/cache.ts`) so that's a contained swap, not a
+  rewrite, when/if it's needed.
