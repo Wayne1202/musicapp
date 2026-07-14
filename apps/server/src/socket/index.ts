@@ -31,7 +31,7 @@ import {
   updateRoomSettings,
 } from "../services/roomService";
 import { getQueue } from "../services/queueService";
-import { advanceToNextSong, getLivePlaybackState, pause, play, seek } from "../services/playbackService";
+import { advanceToNextSong, getLivePlaybackState, pause, play, playFallbackIfIdle, seek } from "../services/playbackService";
 import { sendMessage, sendSystemMessage } from "../services/chatService";
 import { recordRoomEvent } from "../services/roomEventService";
 import { assertValidReaction, isReactionAllowed } from "../services/reactionService";
@@ -182,6 +182,16 @@ export function registerSocketHandlers(io: TypedServer) {
 
         const room = await getRoomDTOById(payload.roomId);
         socket.emit(SocketEvents.ROOM_STATE, { room });
+
+        // Covers the room-never-had-anything-playing case (advanceQueue only fires when a
+        // *playing* song runs out) — start something the moment someone's actually here.
+        const fallbackState = await playFallbackIfIdle(payload.roomId);
+        if (fallbackState) {
+          const fallbackQueue = await getQueue(payload.roomId);
+          io.to(payload.roomId).emit(SocketEvents.SONG_CHANGED, { playbackState: fallbackState, queue: fallbackQueue });
+          const fallbackMessage = await sendSystemMessage(payload.roomId, "Queue's empty — playing something while you add more 🎲");
+          io.to(payload.roomId).emit(SocketEvents.MESSAGE_RECEIVED, { message: fallbackMessage });
+        }
 
         setPresence(payload.roomId, payload.sessionId, session.displayName, { status: "online", activity: "idle" });
         socket.emit(SocketEvents.PRESENCE_SNAPSHOT, {
