@@ -58,3 +58,21 @@ export function parseIso8601Duration(iso: string): number {
   const [, hours, minutes, seconds] = match;
   return (Number(hours) || 0) * 3600 + (Number(minutes) || 0) * 60 + (Number(seconds) || 0);
 }
+
+const NAMED_HTML_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+};
+
+/** The YouTube Data API's `snippet.title`/`channelTitle` fields sometimes come back with HTML
+ *  entities escaped (e.g. "90&#39;s" instead of "90's") — decodes the handful of entities that
+ *  actually show up in practice, without pulling in a full HTML-parsing dependency for it. */
+export function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&#(\d+);/g, (_, code: string) => String.fromCharCode(Number(code)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, code: string) => String.fromCharCode(parseInt(code, 16)))
+    .replace(/&(amp|lt|gt|quot|apos);/g, (_, name: string) => NAMED_HTML_ENTITIES[name]);
+}

@@ -1,4 +1,4 @@
-import { buildYouTubeThumbnailUrl, parseIso8601Duration } from "@musicapp/shared";
+import { buildYouTubeThumbnailUrl, decodeHtmlEntities, parseIso8601Duration } from "@musicapp/shared";
 import { env } from "../../lib/env";
 import { HttpError } from "../../lib/http-error";
 import { logger } from "../../lib/logger";
@@ -72,7 +72,7 @@ export function mapSnippetAndDuration(item: {
     buildYouTubeThumbnailUrl(item.id);
 
   return {
-    title: item.snippet.title,
+    title: decodeHtmlEntities(item.snippet.title),
     thumbnail,
     duration: parseIso8601Duration(item.contentDetails.duration),
   };
@@ -91,7 +91,7 @@ async function fetchViaOEmbed(videoId: string): Promise<YouTubeVideoMetadata> {
 
   return {
     videoId,
-    title: data.title,
+    title: decodeHtmlEntities(data.title),
     thumbnail: data.thumbnail_url ?? buildYouTubeThumbnailUrl(videoId),
     duration: 0,
   };

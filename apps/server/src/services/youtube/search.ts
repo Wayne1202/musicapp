@@ -1,4 +1,4 @@
-import { buildYouTubeThumbnailUrl, parseIso8601Duration } from "@musicapp/shared";
+import { buildYouTubeThumbnailUrl, decodeHtmlEntities, parseIso8601Duration } from "@musicapp/shared";
 import type { SearchResultDTO } from "@musicapp/shared";
 import { env } from "../../lib/env";
 import { HttpError } from "../../lib/http-error";
@@ -70,8 +70,8 @@ async function fetchFromDataApi(query: string, apiKey: string): Promise<SearchRe
     const videoId = item.id.videoId!;
     return {
       videoId,
-      title: item.snippet.title,
-      channelTitle: item.snippet.channelTitle,
+      title: decodeHtmlEntities(item.snippet.title),
+      channelTitle: decodeHtmlEntities(item.snippet.channelTitle),
       thumbnail:
         item.snippet.thumbnails?.high?.url ??
         item.snippet.thumbnails?.medium?.url ??
