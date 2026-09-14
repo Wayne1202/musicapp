@@ -11,6 +11,7 @@ import { formatClockTime } from "@/lib/utils";
 import { usePresence } from "@/hooks/usePresence";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
+import { EmojiPicker } from "@/components/room/EmojiPicker";
 import { toast } from "@/lib/toast";
 
 const MAX_MESSAGE_LENGTH = 500;
@@ -139,6 +140,7 @@ export function ChatPanel({ roomId, sessionId, displayName, onlineUsers, chatEna
           placeholderTextColor={colors.mutedForeground}
           maxLength={MAX_MESSAGE_LENGTH}
         />
+        <EmojiPicker onSelect={(emoji) => setDraft((current) => `${current}${emoji}`)} />
         <Button onPress={handleSend} disabled={!draft.trim()} style={styles.sendButton}>
           ➤
         </Button>
