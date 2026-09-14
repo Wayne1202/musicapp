@@ -7,6 +7,8 @@ import { formatDuration } from "@/lib/utils";
 import { useQueueActions } from "@/hooks/useQueueActions";
 import { getSocket } from "@/lib/socket";
 import { Button } from "@/components/ui/Button";
+import { RecentlyPlayed } from "@/components/room/RecentlyPlayed";
+import { RoomHistory } from "@/components/room/RoomHistory";
 
 interface QueueProps {
   queue: QueueItemDTO[];
@@ -37,6 +39,8 @@ export function Queue({ queue, roomId, sessionId, repeatQueue, settings, hostSes
           ({queue.length}){queue.length > 0 && ` · ${formatDuration(remainingSeconds)} left`}
         </Text>
         <View style={styles.headerActions}>
+          <RecentlyPlayed roomId={roomId} />
+          <RoomHistory roomId={roomId} />
           {isHost && (
             <IconButton
               active={settings.queueLocked}

@@ -24,6 +24,7 @@ import { Queue } from "@/components/room/Queue";
 import { OnlineUsers } from "@/components/room/OnlineUsers";
 import { ChatPanel } from "@/components/room/ChatPanel";
 import { VoteSkipBanner } from "@/components/room/VoteSkipBanner";
+import { ReactionLayer } from "@/components/room/ReactionLayer";
 
 export default function RoomScreen() {
   const { code: rawCode } = useLocalSearchParams<{ code: string }>();
@@ -129,6 +130,8 @@ function RoomShell({
       <AddSongForm roomId={room.id} sessionId={session.sessionId} settings={room.settings} hostSessionId={room.hostSessionId} />
 
       <NowPlaying playbackState={room.playbackState} controller={controller} />
+
+      <ReactionLayer roomId={room.id} sessionId={session.sessionId} reactionsEnabled={room.settings.reactionsEnabled} />
 
       <VoteSkipBanner
         vote={vote}
