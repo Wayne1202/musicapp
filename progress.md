@@ -37,7 +37,12 @@ environment-level blockers, not product ones.
   (add/remove/move via up/down buttons, lock/repeat/shuffle/clear, clear
   confirmation modal), OnlineUsers (avatars, host crown, away/activity,
   make-host), ChatPanel (history + live messages, typing indicator,
-  @mention "you were mentioned" toast), VoteSkipBanner.
+  @mention "you were mentioned" toast, emoji picker), VoteSkipBanner,
+  ReactionLayer (floating-emoji overlay, RN `Animated` instead of the web
+  app's CSS keyframes), RecentlyPlayed + RoomHistory (on-demand-fetch
+  modals), InviteDialog (room code, QR code, copy link, native share
+  sheet), RoomSettingsDialog (queue-add permission, skip mode, all the
+  toggle settings, end-room with confirmation).
 
 **Verified end-to-end** (via `expo start --web` in the in-app browser,
 cross-checked against the real web app running in a second browser tab,
@@ -64,15 +69,9 @@ wasn't built in this pass:
 - Message-mention autocomplete dropdown (mention *highlighting rendering*
   and the "you were mentioned" toast ARE implemented; only the
   type-ahead suggestion list while composing is missing)
-- Emoji picker in chat
-- Drag-and-drop queue reordering (up/down buttons work as a full
-  functional substitute today)
-- Reactions (the floating-emoji overlay on NowPlaying)
-- Room settings dialog (queue-add permission, skip mode, chat/reactions
-  toggles, allow-guest-reorder — the underlying settings and their
-  permission checks are all respected via `packages/shared`'s
-  `permissions.ts`, there's just no UI to change them from mobile yet)
-- Recently-played and room-history views
+- Drag-and-drop queue reordering (up/down buttons are a full functional
+  substitute today — same `canEditQueue` permission gate, same
+  remove/move/shuffle/clear actions, just no drag gesture)
 
 ## Known follow-ups (environment, not code)
 

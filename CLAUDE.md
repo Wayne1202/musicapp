@@ -93,16 +93,18 @@ real-time room chat with @mentions. Not implemented: auth beyond guest
 sessions, Spotify integration, karaoke — all explicitly out of scope per
 the spec.
 
-**Phase 5 (native mobile app, `apps/mobile`)**: core loop implemented and
-verified end-to-end (create/join room, real-time sync with the web app,
-YouTube player mount + play/pause/seek, queue add/remove/move, chat,
-online users + host transfer, vote-skip). Deliberately deferred, not
-architecturally blocked: message-mention autocomplete, emoji picker,
-drag-and-drop queue reorder (up/down buttons work instead), reactions,
-room settings dialog, recently-played/history views. See `progress.md`
-for the phase-by-phase build log and `BLOCKED.md` for environment gaps
-(no full Xcode install on the dev machine at the time this was built, no
-Android emulator) that limited how much of it could be self-verified
+**Phase 5 (native mobile app, `apps/mobile`)**: near full feature parity
+with apps/web, verified end-to-end (create/join room, real-time sync with
+the web app, YouTube player mount + play/pause/seek, queue add/remove/
+move, chat with emoji picker, reactions, online users + host transfer,
+vote-skip, invite via QR/link/share, room settings, recently-played/room-
+history). Deliberately deferred, not architecturally blocked:
+message-mention autocomplete (plain @mentions still highlight and toast)
+and drag-and-drop queue reorder (up/down buttons are a full functional
+substitute). See `progress.md` for the phase-by-phase build log and
+`BLOCKED.md` for environment gaps (no full Xcode install on the dev
+machine at the time this was built, no Android emulator) that limited how
+much of it could be self-verified
 versus needing manual testing.
 
 **Known platform limitation** (not a bug, and confirmed not fixable by going

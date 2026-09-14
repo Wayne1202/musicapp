@@ -69,10 +69,10 @@ Expo Go app on a physical device. `.env.example` explains why `localhost` only w
 iOS Simulator (or a web preview) and what to use instead for a physical device or the Android
 emulator.
 
-**Not implemented / deliberately deferred**: message-mention autocomplete, the emoji picker,
-drag-and-drop queue reordering (up/down buttons work instead), reactions, the room settings
-dialog, and recently-played/room-history views. All exist on the web app; none are
-architecturally blocked on mobile, they just weren't built yet — see `progress.md`.
+**Not implemented / deliberately deferred**: message-mention autocomplete (plain @mentions
+still highlight and toast) and drag-and-drop queue reordering (up/down buttons are a full
+functional substitute). Both exist on the web app; neither is architecturally blocked on
+mobile, they just weren't built yet — see `progress.md`.
 
 **Background audio**: playback pauses when the app is backgrounded, same as the web app on
 mobile browsers. This isn't a bug to fix — YouTube's embeddable player (the only legitimate way
