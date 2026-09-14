@@ -7,8 +7,12 @@ in sync — playback continues even if you switch tabs or minimize the browser.
 
 - **apps/web** — Next.js 14 (App Router), TypeScript, Tailwind, shadcn/ui, TanStack Query,
   Socket.IO client, react-youtube.
+- **apps/mobile** — Expo (React Native), TypeScript, Expo Router, TanStack Query, Socket.IO
+  client, react-native-youtube-iframe. Same backend, same REST/Socket.IO contract as the web
+  app — see "Mobile app" below.
 - **apps/server** — Node, Express, TypeScript, Socket.IO, Prisma.
-- **packages/shared** — types and constants shared by both apps.
+- **packages/shared** — types, Socket.IO event contracts, and other logic (YouTube URL parsing,
+  playback-position projection, permission checks) shared by all three apps.
 - **Database** — PostgreSQL.
 
 ## Local development
@@ -46,6 +50,36 @@ API. Free to set up:
 
 The free tier is 10,000 quota units/day; search costs 101 units per *uncached* query (see
 "Limitations" below), metadata lookups cost 1.
+
+## Mobile app
+
+`apps/mobile` is an Expo (React Native) client for the same rooms/queue/chat the web app uses —
+it talks to the same backend with no server changes needed (the API is a stateless REST +
+Socket.IO service using a plain `x-session-id` header, not cookies, so a native app calls it
+identically to the web app).
+
+```bash
+cd apps/mobile
+cp .env.example .env   # see the file for physical-device/emulator URL notes
+npx expo start
+```
+
+Then press `i` for the iOS Simulator, `a` for an Android emulator, or scan the QR code with the
+Expo Go app on a physical device. `.env.example` explains why `localhost` only works from the
+iOS Simulator (or a web preview) and what to use instead for a physical device or the Android
+emulator.
+
+**Not implemented / deliberately deferred**: message-mention autocomplete, the emoji picker,
+drag-and-drop queue reordering (up/down buttons work instead), reactions, the room settings
+dialog, and recently-played/room-history views. All exist on the web app; none are
+architecturally blocked on mobile, they just weren't built yet — see `progress.md`.
+
+**Background audio**: playback pauses when the app is backgrounded, same as the web app on
+mobile browsers. This isn't a bug to fix — YouTube's embeddable player (the only legitimate way
+to play YouTube content) runs inside a WebView/iframe sandbox on every platform, including
+inside a native app, specifically so third-party apps can't get background audio the way
+YouTube's own app or a paid subscription service can. See CLAUDE.md's "Known platform
+limitation" for the full reasoning.
 
 ## Deploying to production
 

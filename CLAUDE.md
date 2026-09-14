@@ -47,9 +47,22 @@ plain HTML controls), no Firebase/Supabase, guest sessions only, no karaoke.
 - **apps/web** — Next.js 14 (App Router), React 18, TypeScript, Tailwind,
   shadcn/ui (Radix primitives in `src/components/ui`), TanStack Query,
   socket.io-client, react-youtube.
+- **apps/mobile** — Expo SDK 57 (React Native 0.86, React 19), TypeScript,
+  Expo Router, TanStack Query, socket.io-client, react-native-youtube-iframe.
+  Hits the exact same backend as apps/web (stateless REST + Socket.IO,
+  `x-session-id` header — no cookies, so no CORS/session changes were needed
+  server-side for a native client). Its own `src/hooks/usePlayerController.ts`
+  and `src/components/room/PlayerEngine.tsx` are a from-scratch port, not a
+  copy, of the web app's — react-native-youtube-iframe is a *controlled*
+  component (a `play` boolean prop) rather than react-youtube's imperative
+  playVideo()/pauseVideo(), and its player is rendered visibly (no reason to
+  hide it the way the web app hides its iframe for the browser-tab-audibility
+  trick — see item 6 below). Background audio is *not* solved on mobile
+  either — see "Known platform limitation" below, it now covers native too.
 - **apps/server** — Node, Express, TypeScript, Socket.IO, Prisma.
 - **packages/shared** — types, Socket.IO event name/payload contracts, and
-  YouTube URL parsing utilities shared by both apps (`@musicapp/shared`).
+  YouTube URL parsing / playback-position / permission-check utilities
+  shared by all three apps (`@musicapp/shared`).
 - **Database** — PostgreSQL via Prisma (`apps/server/prisma/schema.prisma`:
   `Room`, `UserSession`, `QueueItem`, `PlaybackState`, `RecentlyPlayedItem`,
   `ChatMessage`).
@@ -68,22 +81,49 @@ gotchas that took a few iterations to get right on Railway (Alpine → Debian
 slim → explicit `apt-get install openssl`, and generating the Prisma client
 *after* `prisma/schema.prisma` is actually in the build context).
 
-Phase 1 (MVP) + Phase 2 (deploy) + Phase 3 (UX depth) are all implemented:
-rooms, queue (add/remove/move/drag-reorder/shuffle/clear/repeat, remaining
-play time), playback sync with periodic drift correction, song attribution
-(queue rows and now-playing), recently-played history, presence (typing
-indicator, colored avatars), toast notifications for room events, a mobile
-bottom mini-player bar, and a real-time room chat. Not implemented: YouTube
-search, auth beyond guest sessions, Spotify integration, karaoke — all
-explicitly out of scope per the spec.
+Phase 1 (MVP) + Phase 2 (deploy) + Phase 3 (UX depth) + Phase 4 (in-app
+search, misc polish) are all implemented on **apps/web**: rooms, queue
+(add/remove/move/drag-reorder/shuffle/clear/repeat, remaining play time),
+in-app YouTube search, playback sync with periodic drift correction, song
+attribution (queue rows and now-playing), recently-played history, room
+history feed, presence (typing indicator, colored avatars), reactions,
+vote-to-skip, room settings (queue lock, skip mode, etc.), toast
+notifications for room events, a mobile-web bottom mini-player bar, and a
+real-time room chat with @mentions. Not implemented: auth beyond guest
+sessions, Spotify integration, karaoke — all explicitly out of scope per
+the spec.
 
-**Known platform limitation** (not a bug): audio does not continue when a
-phone's browser is backgrounded in favor of a *different app* (as opposed to
-switching browser tabs, which works fine). This is an OS-level restriction on
-cross-origin iframe media (our player is an embedded YouTube iframe) that
-every YouTube-embed-based web app hits — fixing it for real would require a
-native app or extracting YouTube's audio stream server-side (the latter
-violates YouTube's ToS and won't be implemented).
+**Phase 5 (native mobile app, `apps/mobile`)**: core loop implemented and
+verified end-to-end (create/join room, real-time sync with the web app,
+YouTube player mount + play/pause/seek, queue add/remove/move, chat,
+online users + host transfer, vote-skip). Deliberately deferred, not
+architecturally blocked: message-mention autocomplete, emoji picker,
+drag-and-drop queue reorder (up/down buttons work instead), reactions,
+room settings dialog, recently-played/history views. See `progress.md`
+for the phase-by-phase build log and `BLOCKED.md` for environment gaps
+(no full Xcode install on the dev machine at the time this was built, no
+Android emulator) that limited how much of it could be self-verified
+versus needing manual testing.
+
+**Known platform limitation** (not a bug, and confirmed not fixable by going
+native either): audio does not continue when a phone's browser is
+backgrounded in favor of a *different app* (as opposed to switching browser
+tabs, which works fine). This was originally written assuming a native app
+would fix it via `UIBackgroundModes`/foreground-service audio — it doesn't.
+YouTube's IFrame Player API (the only legitimate way to embed YouTube
+playback) runs inside a WebView/iframe sandbox by design on *every*
+platform, native apps included, and never exposes a raw stream — this is
+very likely deliberate on YouTube's part, since background audio is a
+Premium-subscription selling point they have a business reason to keep
+exclusive to their own app. Actually fixing this would mean either
+extracting YouTube's audio stream server-side (violates YouTube's ToS, won't
+be implemented) or switching the content source to something with an
+official background-audio SDK (Spotify, Apple Music, ...) — a real product
+pivot (every listener needs a paid account on that service; catalog changes
+from "any YouTube link" to that service's library) that was discussed and
+explicitly deferred, not chosen, when apps/mobile was built. `apps/mobile`
+exists anyway for the native-app/native-UX value on its own, not because it
+solves this.
 
 **Mobile CSS gotcha worth knowing**: a flex item with `min-w-0 flex-1` plus a
 `truncate` child can still force horizontal viewport overflow with certain
@@ -137,3 +177,8 @@ Health check: `curl http://localhost:4000/health`. Optional
 `YOUTUBE_API_KEY` in `apps/server/.env` gets real durations; without it the
 server falls back to YouTube's keyless oEmbed endpoint (title + thumbnail
 only).
+
+For the mobile app: `cd apps/mobile && npx expo start`, then `i`/`a` for a
+simulator/emulator or scan the QR with Expo Go on a physical device. See
+`apps/mobile/.env.example` for why `localhost` only works from the iOS
+Simulator or a web preview, not a physical device or the Android emulator.
