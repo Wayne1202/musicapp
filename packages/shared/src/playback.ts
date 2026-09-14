@@ -1,4 +1,4 @@
-import type { PlaybackStateDTO } from "@musicapp/shared";
+import type { PlaybackStateDTO } from "./types";
 
 /**
  * Projects the server's last-known playback position forward to "now" using wall-clock time

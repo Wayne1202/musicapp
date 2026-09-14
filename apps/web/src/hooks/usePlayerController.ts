@@ -3,8 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { YouTubeEvent, YouTubePlayer } from "react-youtube";
 import { toast } from "sonner";
-import type { PlaybackStateDTO } from "@musicapp/shared";
-import { projectPlaybackPosition } from "@/lib/playback";
+import { projectPlaybackPosition, type PlaybackStateDTO } from "@musicapp/shared";
 import { usePlaybackActions } from "@/hooks/usePlaybackActions";
 
 const TICK_INTERVAL_MS = 500;
