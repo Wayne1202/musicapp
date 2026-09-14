@@ -64,7 +64,15 @@ export function usePlayerController(roomId: string | null, playbackState: Playba
         return;
       }
 
-      const current = await player.getCurrentTime().catch(() => 0);
+      // Plain `await`, not `.catch()` chained onto the call: react-youtube's `getCurrentTime()`
+      // doesn't reliably return a real Promise in every player state, so chaining `.then`/`.catch`
+      // directly onto its return value can throw "not a function" before the chain even attaches.
+      let current = 0;
+      try {
+        current = await player.getCurrentTime();
+      } catch {
+        // ignore, fall back to 0
+      }
       if (Math.abs(current - target) > 1.5) {
         await player.seekTo(target, true);
       }
@@ -99,15 +107,17 @@ export function usePlayerController(roomId: string | null, playbackState: Playba
       const player = playerRef.current;
       if (!hasInteracted || !player || appliedVideoId.current !== playbackState.currentVideoId) return;
 
-      player
-        .getCurrentTime()
-        .then((current: number) => {
+      (async () => {
+        try {
+          const current = await player.getCurrentTime();
           const target = projectPlaybackPosition(playbackState);
           if (Math.abs(current - target) > DRIFT_THRESHOLD_SECONDS) {
             player.seekTo(target, true);
           }
-        })
-        .catch(() => {});
+        } catch {
+          // ignore, try again next tick
+        }
+      })();
     }, TICK_INTERVAL_MS);
 
     return () => clearInterval(interval);
@@ -126,24 +136,35 @@ export function usePlayerController(roomId: string | null, playbackState: Playba
     if (!playbackState.isPlaying) player.pauseVideo();
   };
 
-  const togglePlay = async () => {
-    const player = playerRef.current;
-    if (!player || !playbackState) return;
-    const current = await player.getCurrentTime().catch(() => liveTime);
+  const togglePlay = () => {
+    if (!playerRef.current || !playbackState) return;
+    // `liveTime` (kept in sync by the ticking effect above, same value the progress bar
+    // displays) instead of querying the player directly — react-youtube's `getCurrentTime()`
+    // doesn't reliably return a Promise in every player state, which made every toggle throw
+    // an uncaught "not a function" past the first click and silently drop the action.
     if (playbackState.isPlaying) {
-      pause(current);
+      pause(liveTime);
     } else {
-      play(current);
+      play(liveTime);
     }
   };
 
+  // Unlocking (handleStart) only loads/syncs the player to whatever the room's current state
+  // already is — it doesn't act on the user's actual intent. Without also calling the intended
+  // action here, a first tap on a control that promises something (a "Pause" icon, a drag to a
+  // new position) would silently do only the unlock and nothing else, then require a *second*
+  // tap to actually work. Both control paths below unlock-then-act so the very first touch
+  // always does what it visibly claims to do.
   const handlePlayPauseTap = () => {
     if (!hasInteracted) handleStart();
-    else togglePlay();
+    togglePlay();
   };
 
   const handleSeek = (value: number[]) => setLiveTime(value[0]);
-  const handleSeekCommit = (value: number[]) => seek(value[0]);
+  const handleSeekCommit = (value: number[]) => {
+    if (!hasInteracted) handleStart();
+    seek(value[0]);
+  };
 
   const onPlayerReady = (event: YouTubeEvent) => {
     playerRef.current = event.target;
