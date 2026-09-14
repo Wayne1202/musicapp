@@ -25,6 +25,8 @@ import { OnlineUsers } from "@/components/room/OnlineUsers";
 import { ChatPanel } from "@/components/room/ChatPanel";
 import { VoteSkipBanner } from "@/components/room/VoteSkipBanner";
 import { ReactionLayer } from "@/components/room/ReactionLayer";
+import { InviteDialog } from "@/components/room/InviteDialog";
+import { RoomSettingsDialog } from "@/components/room/RoomSettingsDialog";
 
 export default function RoomScreen() {
   const { code: rawCode } = useLocalSearchParams<{ code: string }>();
@@ -124,7 +126,14 @@ function RoomShell({
             <Text style={styles.metaText}>{connected ? "Connected" : "Connecting…"}</Text>
           </View>
         </View>
+      </View>
+
+      <View style={styles.actionsRow}>
         <Text style={styles.metaText}>Online ({room.onlineUsers.length})</Text>
+        <View style={styles.actionsRight}>
+          <InviteDialog roomCode={room.code} roomName={room.name} />
+          <RoomSettingsDialog roomId={room.id} settings={room.settings} isHost={isHost} />
+        </View>
       </View>
 
       <AddSongForm roomId={room.id} sessionId={session.sessionId} settings={room.settings} hostSessionId={room.hostSessionId} />
@@ -236,9 +245,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
+  },
+  actionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingBottom: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+  },
+  actionsRight: {
+    flexDirection: "row",
+    gap: spacing.sm,
   },
   roomName: {
     color: colors.foreground,
