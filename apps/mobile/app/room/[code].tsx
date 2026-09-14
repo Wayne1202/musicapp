@@ -3,8 +3,8 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-nat
 import { useLocalSearchParams } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { ChatMessageDTO, PresenceStateDTO, RoomDTO } from "@musicapp/shared";
-import { SocketEvents } from "@musicapp/shared";
+import type { ChatMessageDTO, PresenceStateDTO, RoomDTO, VoteSkipStateDTO } from "@musicapp/shared";
+import { canSkipInstantly, SocketEvents } from "@musicapp/shared";
 import { colors, spacing } from "@/theme";
 import { getErrorMessage, getRoom, joinRoom } from "@/lib/api";
 import { getRoomSession, getStoredDisplayName, setRoomSession, clearRoomSession, storeDisplayName } from "@/lib/session";
@@ -12,6 +12,7 @@ import type { RoomSession } from "@/lib/session";
 import { useRoomSocket } from "@/hooks/useRoomSocket";
 import { usePlayerController } from "@/hooks/usePlayerController";
 import type { PlayerController } from "@/hooks/usePlayerController";
+import { usePlaybackActions } from "@/hooks/usePlaybackActions";
 import { getSocket } from "@/lib/socket";
 import { toast } from "@/lib/toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -22,6 +23,7 @@ import { AddSongForm } from "@/components/room/AddSongForm";
 import { Queue } from "@/components/room/Queue";
 import { OnlineUsers } from "@/components/room/OnlineUsers";
 import { ChatPanel } from "@/components/room/ChatPanel";
+import { VoteSkipBanner } from "@/components/room/VoteSkipBanner";
 
 export default function RoomScreen() {
   const { code: rawCode } = useLocalSearchParams<{ code: string }>();
@@ -80,6 +82,7 @@ export default function RoomScreen() {
       connected={live.connected}
       presence={live.presence}
       messages={live.messages}
+      vote={live.vote}
       controller={controller}
     />
   );
@@ -91,6 +94,7 @@ function RoomShell({
   connected,
   presence,
   messages,
+  vote,
   controller,
 }: {
   room: RoomDTO;
@@ -98,10 +102,12 @@ function RoomShell({
   connected: boolean;
   presence: Record<string, PresenceStateDTO>;
   messages: ChatMessageDTO[];
+  vote: VoteSkipStateDTO | null;
   controller: PlayerController;
 }) {
   const insets = useSafeAreaInsets();
   const isHost = room.hostSessionId === session.sessionId;
+  const voteActions = usePlaybackActions(room.id);
   const handleMakeHost = (targetSessionId: string) => {
     getSocket().emit(SocketEvents.TRANSFER_HOST, { roomId: room.id, targetSessionId });
   };
@@ -123,6 +129,15 @@ function RoomShell({
       <AddSongForm roomId={room.id} sessionId={session.sessionId} settings={room.settings} hostSessionId={room.hostSessionId} />
 
       <NowPlaying playbackState={room.playbackState} controller={controller} />
+
+      <VoteSkipBanner
+        vote={vote}
+        sessionId={session.sessionId}
+        canSkipInstantly={canSkipInstantly({ hostSessionId: room.hostSessionId, ...room.settings }, session.sessionId)}
+        hasSong={Boolean(room.playbackState?.currentVideoId)}
+        onStartVote={voteActions.startVoteSkip}
+        onCastVote={voteActions.castVoteSkip}
+      />
 
       <Queue
         queue={room.queue}
