@@ -37,13 +37,23 @@ mobile instantly via the shared Socket.IO room state. Confirms the ported
 socket/api layer actually interoperates with the existing backend, not
 just typechecks.
 
+- **Phase 6 — Player integration**: `react-native-youtube-iframe` +
+  `usePlaybackActions.ts` (direct port) + `usePlayerController.ts`
+  (adapted for the library's controlled-component API — see commit
+  7e40f2e for the full architecture note) + `PlayerEngine.tsx` (visible,
+  unlike the web app's hidden hack) + `NowPlaying.tsx`. A real bug
+  surfaced and was fixed (`safeSeekTo` wrapper — the library's seekTo can
+  throw synchronously before the player ref is ready). Player mounting
+  and video metadata loading verified in-browser; full interactive
+  play/pause/seek verification needs the iOS Simulator or a physical
+  device (see BLOCKED.md — the browser workaround's own WebView shim
+  doesn't support the commands needed to test this further).
+
 ## In progress / next
 
-- Phase 6: player integration (`react-native-youtube-iframe`, ported
-  `usePlayerController`).
-- Phase 7: full room UI port (NowPlaying, Queue w/ drag reorder,
-  AddSongForm, OnlineUsers, Chat, reactions, vote-skip, settings,
-  recently played/history).
+- Phase 7: full room UI port (Queue w/ drag reorder, AddSongForm,
+  OnlineUsers, Chat, reactions, vote-skip, settings, recently played/
+  history).
 - Phase 8: lifecycle polish.
 - Phase 9: final pass, README update.
 
