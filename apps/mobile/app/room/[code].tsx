@@ -3,15 +3,19 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-nat
 import { useLocalSearchParams } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import type { PlaybackStateDTO } from "@musicapp/shared";
 import { colors, spacing } from "@/theme";
 import { getErrorMessage, getRoom, joinRoom } from "@/lib/api";
 import { getRoomSession, getStoredDisplayName, setRoomSession, clearRoomSession, storeDisplayName } from "@/lib/session";
 import type { RoomSession } from "@/lib/session";
 import { useRoomSocket } from "@/hooks/useRoomSocket";
+import { usePlayerController } from "@/hooks/usePlayerController";
+import type { PlayerController } from "@/hooks/usePlayerController";
 import { toast } from "@/lib/toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { TextField } from "@/components/ui/TextField";
 import { Button } from "@/components/ui/Button";
+import { NowPlaying } from "@/components/room/NowPlaying";
 
 export default function RoomScreen() {
   const { code: rawCode } = useLocalSearchParams<{ code: string }>();
@@ -37,6 +41,8 @@ export default function RoomScreen() {
 
   const roomId = roomQuery.data?.room.id ?? null;
   const live = useRoomSocket(session ? roomId : null, session?.sessionId ?? null);
+  const playbackState = live.room?.playbackState ?? roomQuery.data?.room.playbackState ?? null;
+  const controller = usePlayerController(roomId, playbackState);
 
   useEffect(() => {
     if (live.error) toast.error(live.error);
@@ -67,30 +73,30 @@ export default function RoomScreen() {
       roomCode={room.code}
       onlineCount={room.onlineUsers.length}
       connected={live.connected}
-      nowPlayingTitle={room.playbackState?.currentTitle ?? null}
-      isPlaying={room.playbackState?.isPlaying ?? false}
+      playbackState={room.playbackState}
+      controller={controller}
       queueCount={room.queue.length}
     />
   );
 }
 
-/** Minimal room shell for this milestone: header + now-playing/queue summary. Full player,
- *  queue, chat, presence, reactions etc. land in later phases (see progress.md). */
+/** Minimal room shell for this milestone: header + player + queue count. Full queue, chat,
+ *  presence, reactions etc. land in later phases (see progress.md). */
 function RoomShell({
   roomName,
   roomCode,
   onlineCount,
   connected,
-  nowPlayingTitle,
-  isPlaying,
+  playbackState,
+  controller,
   queueCount,
 }: {
   roomName: string;
   roomCode: string;
   onlineCount: number;
   connected: boolean;
-  nowPlayingTitle: string | null;
-  isPlaying: boolean;
+  playbackState: PlaybackStateDTO | null;
+  controller: PlayerController;
   queueCount: number;
 }) {
   const insets = useSafeAreaInsets();
@@ -108,15 +114,7 @@ function RoomShell({
         <Text style={styles.metaText}>Online ({onlineCount})</Text>
       </View>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Now playing</CardTitle>
-          <CardDescription>{nowPlayingTitle ?? "Nothing playing yet — add a song below"}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Text style={styles.metaText}>{isPlaying ? "▶ Playing" : "⏸ Paused"}</Text>
-        </CardContent>
-      </Card>
+      <NowPlaying playbackState={playbackState} controller={controller} />
 
       <Card>
         <CardHeader>

@@ -27,3 +27,26 @@ written to be cross-platform correct (Expo/React Native targets both from
 one codebase, no Android-specific code needed for the features built so
 far), but Android has not been self-verified. Needs manual testing by the
 user once Android tooling exists, or a physical device with Expo Go.
+
+## Player interactivity not verifiable via the expo-web workaround (environment)
+
+`react-native-youtube-iframe` needed `react-native-web-webview` (a
+community shim) to bundle at all for `expo start --web` — without it,
+Metro can't resolve `react-native-webview` on the web platform. With it
+installed, the player DOES mount and load the correct video's real
+metadata/thumbnail (confirms `videoId` wiring, network access, and the
+component tree are all correct) — but the shim doesn't implement
+`injectJavaScript`, which the library uses internally to send play/pause/
+seek commands into the underlying iframe. So tapping play produces
+`Uncaught (in promise) TypeError: webViewRef.current.injectJavaScript is
+not a function` from inside the library's own code (not something app
+code can catch/fix) and interactive playback control (play/pause/seek
+actually taking effect) can't be confirmed this way.
+
+`src/hooks/usePlayerController.ts`'s own `seekTo` calls are already
+defensively wrapped (`safeSeekTo`) after this surfaced one real instance
+of it — that fix is verified (no more crash on tap). What's NOT verified
+here is whether `play`/`pause`/`seek` actually reach real playback, since
+that depends entirely on the native WebView bridge this shim doesn't
+provide. Needs the iOS Simulator (blocked above) or a physical device
+with Expo Go to confirm end-to-end.
