@@ -3,7 +3,8 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-nat
 import { useLocalSearchParams } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { PlaybackStateDTO } from "@musicapp/shared";
+import type { ChatMessageDTO, PresenceStateDTO, RoomDTO } from "@musicapp/shared";
+import { SocketEvents } from "@musicapp/shared";
 import { colors, spacing } from "@/theme";
 import { getErrorMessage, getRoom, joinRoom } from "@/lib/api";
 import { getRoomSession, getStoredDisplayName, setRoomSession, clearRoomSession, storeDisplayName } from "@/lib/session";
@@ -11,11 +12,16 @@ import type { RoomSession } from "@/lib/session";
 import { useRoomSocket } from "@/hooks/useRoomSocket";
 import { usePlayerController } from "@/hooks/usePlayerController";
 import type { PlayerController } from "@/hooks/usePlayerController";
+import { getSocket } from "@/lib/socket";
 import { toast } from "@/lib/toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { TextField } from "@/components/ui/TextField";
 import { Button } from "@/components/ui/Button";
 import { NowPlaying } from "@/components/room/NowPlaying";
+import { AddSongForm } from "@/components/room/AddSongForm";
+import { Queue } from "@/components/room/Queue";
+import { OnlineUsers } from "@/components/room/OnlineUsers";
+import { ChatPanel } from "@/components/room/ChatPanel";
 
 export default function RoomScreen() {
   const { code: rawCode } = useLocalSearchParams<{ code: string }>();
@@ -69,58 +75,82 @@ export default function RoomScreen() {
 
   return (
     <RoomShell
-      roomName={room.name}
-      roomCode={room.code}
-      onlineCount={room.onlineUsers.length}
+      room={room}
+      session={session}
       connected={live.connected}
-      playbackState={room.playbackState}
+      presence={live.presence}
+      messages={live.messages}
       controller={controller}
-      queueCount={room.queue.length}
     />
   );
 }
 
-/** Minimal room shell for this milestone: header + player + queue count. Full queue, chat,
- *  presence, reactions etc. land in later phases (see progress.md). */
 function RoomShell({
-  roomName,
-  roomCode,
-  onlineCount,
+  room,
+  session,
   connected,
-  playbackState,
+  presence,
+  messages,
   controller,
-  queueCount,
 }: {
-  roomName: string;
-  roomCode: string;
-  onlineCount: number;
+  room: RoomDTO;
+  session: RoomSession;
   connected: boolean;
-  playbackState: PlaybackStateDTO | null;
+  presence: Record<string, PresenceStateDTO>;
+  messages: ChatMessageDTO[];
   controller: PlayerController;
-  queueCount: number;
 }) {
   const insets = useSafeAreaInsets();
+  const isHost = room.hostSessionId === session.sessionId;
+  const handleMakeHost = (targetSessionId: string) => {
+    getSocket().emit(SocketEvents.TRANSFER_HOST, { roomId: room.id, targetSessionId });
+  };
+
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ padding: spacing.lg, paddingTop: insets.top + spacing.lg, gap: spacing.lg }}>
       <View style={styles.headerRow}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.roomName}>{roomName}</Text>
+          <Text style={styles.roomName}>{room.name}</Text>
           <View style={styles.metaRow}>
-            <Text style={styles.code}>{roomCode}</Text>
+            <Text style={styles.code}>{room.code}</Text>
             <View style={[styles.dot, { backgroundColor: connected ? colors.primary : colors.mutedForeground }]} />
             <Text style={styles.metaText}>{connected ? "Connected" : "Connecting…"}</Text>
           </View>
         </View>
-        <Text style={styles.metaText}>Online ({onlineCount})</Text>
+        <Text style={styles.metaText}>Online ({room.onlineUsers.length})</Text>
       </View>
 
-      <NowPlaying playbackState={playbackState} controller={controller} />
+      <AddSongForm roomId={room.id} sessionId={session.sessionId} settings={room.settings} hostSessionId={room.hostSessionId} />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Queue ({queueCount})</CardTitle>
-        </CardHeader>
-      </Card>
+      <NowPlaying playbackState={room.playbackState} controller={controller} />
+
+      <Queue
+        queue={room.queue}
+        roomId={room.id}
+        sessionId={session.sessionId}
+        repeatQueue={room.repeatQueue}
+        settings={room.settings}
+        hostSessionId={room.hostSessionId}
+        presence={presence}
+      />
+
+      <OnlineUsers
+        users={room.onlineUsers}
+        currentSessionId={session.sessionId}
+        hostSessionId={room.hostSessionId}
+        presence={presence}
+        onMakeHost={isHost ? handleMakeHost : undefined}
+      />
+
+      <ChatPanel
+        roomId={room.id}
+        sessionId={session.sessionId}
+        displayName={session.displayName}
+        onlineUsers={room.onlineUsers}
+        chatEnabled={room.settings.chatEnabled}
+        presence={presence}
+        liveMessages={messages}
+      />
     </ScrollView>
   );
 }
