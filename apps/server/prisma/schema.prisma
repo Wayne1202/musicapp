@@ -170,3 +170,67 @@ model RoomEvent {
 
   @@index([roomId, createdAt])
 }
+
+// --- Karaoke (separate room type from Room/UserSession above — a singer + listeners + live mic
+// audio session, not a shared YouTube queue. See PROJECT_KARAOKE.md for why this is a parallel
+// model rather than extending Room/UserSession.) ---
+
+enum KaraokeRoomStatus {
+  WAITING
+  SINGING
+  ENDED
+}
+
+enum KaraokeRole {
+  SINGER
+  LISTENER
+}
+
+model KaraokeRoom {
+  id     String            @id @default(cuid())
+  code   String            @unique
+  status KaraokeRoomStatus @default(WAITING)
+
+  // Plain id reference (not a Prisma relation), same style as Room.hostSessionId above —
+  // avoids a circular/self-referential relation just to point at "whichever member is singing".
+  singerMemberId String?
+
+  // Shaped identically to PlaybackState below on purpose: this lets the mobile client reuse
+  // packages/shared's projectPlaybackPosition() (and the same drift-correction logic
+  // usePlayerController already has) verbatim for the karaoke backing track — see
+  // docs/karaoke-audio.md.
+  currentVideoId   String?
+  currentTitle     String?
+  currentThumbnail String?
+  currentDuration  Int     @default(0)
+  currentTimestamp Float   @default(0)
+  isPlaying        Boolean @default(false)
+
+  // Separate from `status`: SINGING means "the performance has started", micOn tracks
+  // moment-to-moment mute state within that performance (the spec's "Mic ON/OFF" control is
+  // distinct from "Start Singing"/"End Session").
+  micOn Boolean @default(false)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  endedAt   DateTime?
+
+  members KaraokeMember[]
+
+  @@index([code])
+}
+
+model KaraokeMember {
+  id          String      @id @default(cuid())
+  roomId      String
+  displayName String
+  role        KaraokeRole @default(LISTENER)
+  isOnline    Boolean     @default(true)
+  lastSeenAt  DateTime    @default(now())
+  createdAt   DateTime    @default(now())
+
+  room KaraokeRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@index([roomId, isOnline])
+}

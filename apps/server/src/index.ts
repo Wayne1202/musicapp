@@ -4,7 +4,6 @@ import cors from "cors";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import { Prisma } from "@prisma/client";
-import type { ClientToServerEvents, ServerToClientEvents } from "@musicapp/shared";
 import { env } from "./lib/env";
 import { HttpError } from "./lib/http-error";
 import { logger } from "./lib/logger";
@@ -12,8 +11,10 @@ import { createRoomsRouter } from "./routes/rooms";
 import { createQueueRouter } from "./routes/queue";
 import { createHistoryRouter } from "./routes/history";
 import { createChatRouter } from "./routes/chat";
+import { createKaraokeRouter } from "./routes/karaoke";
 import { registerSocketHandlers } from "./socket";
-import type { SocketData } from "./types/socket";
+import { registerKaraokeSocketHandlers } from "./socket/karaoke";
+import type { TypedServer } from "./types/socket";
 
 const app = express();
 // Behind Railway's (or any) reverse proxy, this is needed for correct protocol/IP detection.
@@ -22,7 +23,7 @@ app.use(cors({ origin: env.clientOrigins }));
 app.use(express.json());
 
 const httpServer = createServer(app);
-const io = new Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>(httpServer, {
+const io: TypedServer = new Server(httpServer, {
   cors: { origin: env.clientOrigins },
 });
 
@@ -31,6 +32,7 @@ app.use("/api/rooms", createRoomsRouter(io));
 app.use("/api/rooms", createQueueRouter(io));
 app.use("/api/rooms", createHistoryRouter());
 app.use("/api/rooms", createChatRouter());
+app.use("/api/karaoke-rooms", createKaraokeRouter(io));
 
 const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   if (err instanceof HttpError) {
@@ -55,6 +57,7 @@ const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
 app.use(errorHandler);
 
 registerSocketHandlers(io);
+registerKaraokeSocketHandlers(io);
 
 httpServer.listen(env.port, () => {
   logger.info("startup", `musicapp server listening on http://localhost:${env.port}`);
