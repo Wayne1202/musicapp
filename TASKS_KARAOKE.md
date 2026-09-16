@@ -5,8 +5,8 @@ Legend: `[ ]` todo, `[x]` done, `[!]` blocked (see reason + BLOCKED.md)
 ## Inspection & docs
 - [x] Inspect existing architecture (backend, mobile, realtime, auth, state, config)
 - [x] Write PROJECT_KARAOKE.md
-- [ ] Write docs/karaoke-audio.md (sync strategy)
-- [ ] Final report (9-point summary requested in the task)
+- [x] Write docs/karaoke-audio.md (sync strategy)
+- [x] Final report (9-point summary requested in the task)
 
 ## Backend — schema
 - [x] Prisma: KaraokeRoom, KaraokeMember models + enums
@@ -44,12 +44,56 @@ Legend: `[ ]` todo, `[x]` done, `[!]` blocked (see reason + BLOCKED.md)
 - [x] Entry point from Home screen
 
 ## Verification
-- [ ] Full monorepo typecheck/build
-- [ ] Scripted 2-client signaling test (offer/answer/ICE relay correctness, no real audio needed)
-- [ ] Attempt EAS Android build (installable APK, no local Xcode/Android Studio needed)
-- [ ] Document manual test steps for Scenarios A-E (real device audio — needs user's phones)
+- [x] Full monorepo typecheck/build (shared, server, web, mobile) — clean
+- [x] Scripted 2-client signaling test (offer/answer/ICE relay correctness, no real audio needed)
+      — all checks passed
+- [x] Code review pass — found and fixed a real bug (useKaraokeWebRTC's members list was sourced
+      from a stale one-time REST snapshot instead of the live socket-updated list; see commit
+      b690be8 for the full writeup)
+- [x] Attempt EAS Android build (installable APK, no local Xcode/Android Studio needed) — queued
+      and building in EAS's cloud as of this writing; see BLOCKED.md for the build URL / how to
+      check status (`eas build:list`)
+- [x] Attempted EAS iOS build to confirm exactly where it blocks (Apple credentials, needs the
+      user's own interactive login — see BLOCKED.md)
+- [ ] Real WebRTC audio between two devices — genuinely cannot be observed by the agent in this
+      environment (no Expo Go support, no expo-web fallback either — see BLOCKED.md). Needs the
+      user to install the EAS build on a real device.
+- [x] Document manual test steps for Scenarios A-E (see the final report / this file's "test
+      plan" — everything is written and ready for the user to run once a device build exists)
 
 ## Known blockers (see BLOCKED.md for detail)
-- [!] react-native-webrtc cannot run in Expo Go — needs a custom dev client
+- [!] react-native-webrtc cannot run in Expo Go — needs a custom dev client (in progress via EAS)
 - [!] iOS dev client build needs either local Xcode (already blocked, see BLOCKED.md) or the
       user's own Apple ID in an interactive EAS credentials flow
+- [!] Real device audio/latency/sync validation (Scenarios B-E below) needs the user's own
+      phones — cannot be performed by the agent
+
+## Test plan (for the user, once a device build exists — see "exact steps to test" in the final report)
+
+**Scenario A — one phone, singer only**: create a room, select a song (paste a YouTube URL),
+tap "Start Singing", turn the mic on. Expect: backing track plays, mic toggles without crashing,
+no listener-side anything to check yet.
+
+**Scenario B — two phones, singer + one listener**: Phone A creates a room and becomes singer;
+Phone B joins with the room code as a listener. Singer selects a song, starts singing, turns mic
+on. Expect: listener hears the backing track (their own local YouTube playback) roughly in sync
+with the singer's, *and* hears the singer's live voice via WebRTC. This is the core scenario the
+whole feature exists to prove — everything else is secondary to this working.
+
+**Scenario C — three phones, singer + two listeners**: same as B with a second listener joining
+before or after the singer starts. Expect: both listeners independently connect (one
+`RTCPeerConnection` each, from the singer) and both hear the singer.
+
+**Scenario D — network changes**: while connected, switch a listener's phone from wifi to mobile
+data (and back), briefly toggle airplane mode, then let it settle. Expect: the socket layer
+reconnects on its own (`useKaraokeRoomSocket`'s `AppState`-triggered reconnect plus socket.io's
+own reconnection) and re-syncs room state; the WebRTC peer connection's `connectionState` should
+show `disconnected` then either recover or need the listener to leave/rejoin if it lands in
+`failed` (no automatic ICE restart is implemented for MVP — see docs/karaoke-audio.md's known
+limitations).
+
+**Scenario E — room lifecycle**: create → join (as listener) → singer starts singing → singer
+ends session. Expect: listener sees "This karaoke session has ended" and is returned to the
+karaoke home screen; the singer's local peer connections/mic are torn down
+(`webrtc.teardown()`); rejoining the same room code afterward should correctly report "not
+found"-equivalent (room status ENDED) rather than letting anyone back in.
