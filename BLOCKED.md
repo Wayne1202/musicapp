@@ -80,11 +80,25 @@ this agent in this environment. It needs either:
 See TASKS_KARAOKE.md for what's been attempted and docs/karaoke-audio.md for the full
 architecture this needs to validate.
 
+**Important gotcha found and fixed**: EAS cloud builds do **not** automatically pick up
+`apps/mobile/.env` the way local `expo start` does — they use EAS's own separate "Environments"
+feature (`eas env:*`), which was empty. The first Android build queued (and sat queued for 35+
+minutes) would have installed with no backend URL configured at all — every request would have
+silently tried `http://localhost:4000` (the code's hardcoded fallback), which on a real phone
+means "the phone's own localhost," i.e. nothing. Fixed by running `eas env:create` for
+`EXPO_PUBLIC_API_URL`/`EXPO_PUBLIC_SOCKET_URL`/`EXPO_PUBLIC_WEB_ORIGIN` on both the
+`development` and `preview` environments (pointed at the production Railway/Vercel URLs, now
+that production is verified working with the karaoke migration applied — see the "production
+deploy" note in `progress.md`/`TASKS_KARAOKE.md`), then cancelling and resubmitting the build so
+it picks the new values up (environment resolution happens at submission time, not build-start
+time, so the original already-queued build would not have retroactively picked them up).
+
 **EAS build attempts** (both `--non-interactive`, both from `apps/mobile`):
-- `eas build --profile development --platform android` — **succeeded** in starting (queued and
-  building in EAS's cloud as of this writing; no local Xcode/Android Studio needed at all). Will
-  produce a real installable `.apk` — see the console output linked from this session for the
-  build URL, or run `eas build:list` to find it.
+- `eas build --profile development --platform android` — **succeeded** in starting (build id
+  `6a541620-86f6-42ca-a377-9ee634ed4bc5`; a first attempt, `0f00c471-...`, was cancelled and
+  resubmitted after fixing the env-vars gotcha above). No local Xcode/Android Studio needed at
+  all. Check status: `eas build:view 6a541620-86f6-42ca-a377-9ee634ed4bc5`, or
+  https://expo.dev/accounts/wayne1202/projects/musicapp-mobile/builds/6a541620-86f6-42ca-a377-9ee634ed4bc5
 - `eas build --profile development --platform ios` — **fails immediately** at the credentials
   step: `"You're in non-interactive mode. EAS CLI couldn't find any credentials suitable for
   internal distribution. Run this command again in interactive mode."` This needs the user to

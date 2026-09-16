@@ -7,6 +7,15 @@ limitation, confirmed not fixable by going native (see CLAUDE.md's "Known
 platform limitation" for the full reasoning) — see `BLOCKED.md` for
 environment-level blockers, not product ones.
 
+**Deployed**: pushed to `main` and live in production as of this writing — Railway auto-deployed
+the updated backend (the karaoke migration applied automatically via the Dockerfile's
+`prisma migrate deploy` step, verified against the real production database) and Vercel
+redeployed the unchanged web app. EAS build env vars (`development`/`preview` environments) are
+configured to point real device builds at the production Railway/Vercel URLs rather than this
+Mac's local dev server, so an installed build works from any network. See
+`TASKS_KARAOKE.md`/`BLOCKED.md` for the karaoke feature specifically (a separate, later addition
+to this same mobile app).
+
 ## Shipped (core loop complete, end-to-end verified)
 
 - **Scaffold**: `apps/mobile` (Expo SDK 57, TypeScript, Expo Router, React 19
