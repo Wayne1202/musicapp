@@ -1,11 +1,13 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors, spacing } from "@/theme";
+import { colors, radius, spacing } from "@/theme";
 import { CreateRoomForm } from "@/components/home/CreateRoomForm";
 import { JoinRoomForm } from "@/components/home/JoinRoomForm";
 
 export default function Home() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   return (
     <ScrollView
@@ -21,6 +23,10 @@ export default function Home() {
           Queue YouTube songs, stay in sync with friends, and keep the music playing while you browse or game.
         </Text>
       </View>
+
+      <Pressable style={styles.karaokeBanner} onPress={() => router.push("/karaoke")}>
+        <Text style={styles.karaokeBannerText}>🎤 Try Karaoke — sing live, friends listen in</Text>
+      </Pressable>
 
       <View style={styles.forms}>
         <CreateRoomForm />
@@ -69,5 +75,18 @@ const styles = StyleSheet.create({
   },
   forms: {
     gap: spacing.lg,
+  },
+  karaokeBanner: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    alignItems: "center",
+  },
+  karaokeBannerText: {
+    color: colors.foreground,
+    fontSize: 14,
+    fontWeight: "600",
   },
 });

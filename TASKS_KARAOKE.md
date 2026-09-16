@@ -9,26 +9,32 @@ Legend: `[ ]` todo, `[x]` done, `[!]` blocked (see reason + BLOCKED.md)
 - [ ] Final report (9-point summary requested in the task)
 
 ## Backend — schema
-- [ ] Prisma: KaraokeRoom, KaraokeMember models + enums
-- [ ] Migration created and applied locally
+- [x] Prisma: KaraokeRoom, KaraokeMember models + enums
+- [x] Migration created and applied locally
 
 ## Backend — REST
-- [ ] karaokeSessionAuth middleware
-- [ ] karaokeRoomService (create/join/get/select-song/end)
-- [ ] routes/karaoke.ts wired into index.ts
+- [x] karaokeSessionAuth middleware
+- [x] karaokeRoomService (create/join/get/select-song/end)
+- [x] routes/karaoke.ts wired into index.ts
 
 ## Backend — realtime signaling
-- [ ] packages/shared: karaoke types + socket event contracts
-- [ ] socket/karaoke.ts: join/leave, start/stop singing, mic toggle, end session
-- [ ] socket/karaoke.ts: WebRTC offer/answer/ICE relay (singer <-> each listener)
-- [ ] disconnect cleanup (singer leaves -> end room; listener leaves -> remove + notify)
+- [x] packages/shared: karaoke types + socket event contracts
+- [x] socket/karaoke.ts: join/leave, start/stop singing, mic toggle, end session
+- [x] socket/karaoke.ts: WebRTC offer/answer/ICE relay (singer <-> each listener)
+- [x] disconnect cleanup (singer leaves -> end room; listener leaves -> remove + notify)
+- [x] Verified via curl (REST) + scripted 2-client socket.io test (signaling) — all passed
 
 ## Mobile — plumbing
-- [ ] Install react-native-webrtc + config plugin, rebuild dev client requirement documented
-- [ ] karaokeApi.ts (REST client)
-- [ ] karaokeSession.ts (AsyncStorage, mirrors session.ts)
-- [ ] useKaraokeRoomSocket.ts (room state sync, mirrors useRoomSocket)
-- [ ] useKaraokeWebRTC.ts (peer connections, mic capture, signaling)
+- [x] Install react-native-webrtc + config plugin (@config-plugins/react-native-webrtc)
+- [x] Install expo-audio (mic permission API), expo-clipboard/react-native-qrcode-svg (reused
+      from earlier session for invite dialog patterns, not karaoke-specific)
+- [x] karaokeApi.ts (REST client)
+- [x] karaokeSession.ts (AsyncStorage, mirrors session.ts)
+- [x] useKaraokeRoomSocket.ts (room state sync, mirrors useRoomSocket)
+- [x] useKaraokeWebRTC.ts (peer connections, mic capture, signaling)
+- [x] Fixed upstream react-native-webrtc@124.0.8 packaging bug (missing
+      lib/typescript/vendor/event-target-shim types) via a postinstall script — see
+      apps/mobile/scripts/fix-webrtc-types.js. Full typecheck clean.
 
 ## Mobile — UI
 - [ ] app/karaoke/index.tsx (create/join)

@@ -4,22 +4,7 @@ import { PLAYER_STATES } from "react-native-youtube-iframe";
 import { projectPlaybackPosition, type PlaybackStateDTO } from "@musicapp/shared";
 import { usePlaybackActions } from "@/hooks/usePlaybackActions";
 import { toast } from "@/lib/toast";
-
-const TICK_INTERVAL_MS = 500;
-const DRIFT_CHECK_INTERVAL_MS = 5000;
-const DRIFT_THRESHOLD_SECONDS = 1.5;
-
-/** `seekTo`'s type says it returns void (fire-and-forget), but the underlying WebView bridge
- *  call can still throw synchronously if the webview ref isn't fully ready yet — same defensive
- *  reasoning as the getCurrentTime() try/catches below: don't trust a WebView-bridged call to be
- *  resilient in every player state. */
-function safeSeekTo(player: YoutubeIframeRef, seconds: number) {
-  try {
-    player.seekTo(seconds, true);
-  } catch {
-    // ignore; the next drift check will retry
-  }
-}
+import { DRIFT_CHECK_INTERVAL_MS, DRIFT_THRESHOLD_SECONDS, TICK_INTERVAL_MS, safeSeekTo } from "@/lib/youtubeSync";
 
 export interface PlayerController {
   playerRef: React.MutableRefObject<YoutubeIframeRef | null>;
