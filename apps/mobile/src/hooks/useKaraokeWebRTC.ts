@@ -27,15 +27,10 @@ interface PeerEntry {
  * one connection (to the singer). Peer connections are created lazily, only once a local mic
  * stream exists — this means the singer never needs to renegotiate an existing connection to add
  * a track later; a listener who joins before the singer's mic is on just waits until it is (see
- * ensureConnectionsForListeners below).
+ * ensureConnections below).
  */
-export function useKaraokeWebRTC(params: {
-  roomId: string | null;
-  memberId: string | null;
-  role: "SINGER" | "LISTENER" | null;
-  members: KaraokeMemberDTO[];
-}) {
-  const { roomId, memberId, role, members } = params;
+export function useKaraokeWebRTC(params: { roomId: string | null; memberId: string | null; role: "SINGER" | "LISTENER" | null }) {
+  const { roomId, memberId, role } = params;
 
   const peersRef = useRef<Map<string, PeerEntry>>(new Map());
   const localStreamRef = useRef<import("react-native-webrtc").MediaStream | null>(null);
@@ -145,18 +140,31 @@ export function useKaraokeWebRTC(params: {
     [getOrCreatePeer, emitOffer],
   );
 
-  const ensureConnectionsForListeners = useCallback(() => {
+  // Last-known member list. Kept fresh only by the public ensureConnections() below (called by
+  // the room screen whenever the live member list changes) so startMic can retry against it
+  // once the mic stream exists, without the room screen needing to call in a second time.
+  const lastMembersRef = useRef<KaraokeMemberDTO[]>([]);
+
+  const connectToOnlineListeners = useCallback(() => {
     if (role !== "SINGER" || !localStreamRef.current) return;
-    for (const member of members) {
+    for (const member of lastMembersRef.current) {
       if (member.id === memberId || member.role !== "LISTENER") continue;
       if (peersRef.current.has(member.id)) continue;
       connectToListener(member.id).catch(() => updatePeerState(member.id, "failed"));
     }
-  }, [role, members, memberId, connectToListener, updatePeerState]);
+  }, [role, memberId, connectToListener, updatePeerState]);
 
-  useEffect(() => {
-    ensureConnectionsForListeners();
-  }, [ensureConnectionsForListeners]);
+  /** Public: connects to any online listener that doesn't have a peer connection yet. Call
+   *  whenever the live member list changes (retroactive case — a brand new join while already
+   *  connected is handled immediately via onMemberJoined below instead, this covers "the mic
+   *  turns on after listeners already joined"). */
+  const ensureConnections = useCallback(
+    (currentMembers: KaraokeMemberDTO[]) => {
+      lastMembersRef.current = currentMembers;
+      connectToOnlineListeners();
+    },
+    [connectToOnlineListeners],
+  );
 
   // --- Signaling handlers, passed into useKaraokeRoomSocket ---
 
@@ -243,11 +251,11 @@ export function useKaraokeWebRTC(params: {
       }
       setMicOnState(true);
       getSocket().emit(KaraokeSocketEvents.KARAOKE_SET_MIC, { roomId, micOn: true });
-      ensureConnectionsForListeners();
+      connectToOnlineListeners();
     } catch {
       setMicPermissionDenied(true);
     }
-  }, [role, roomId, ensureConnectionsForListeners]);
+  }, [role, roomId, connectToOnlineListeners]);
 
   const stopMic = useCallback(() => {
     if (role !== "SINGER" || !roomId) return;
@@ -277,6 +285,7 @@ export function useKaraokeWebRTC(params: {
 
   return {
     signalingHandlers,
+    ensureConnections,
     micOn,
     micPermissionDenied,
     startMic,

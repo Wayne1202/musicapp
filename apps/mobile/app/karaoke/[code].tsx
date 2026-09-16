@@ -52,13 +52,20 @@ export default function KaraokeRoomScreen() {
   const roomId = roomQuery.data?.room.id ?? null;
   const role = session?.role ?? null;
 
-  const webrtc = useKaraokeWebRTC({
-    roomId,
-    memberId: session?.memberId ?? null,
-    role,
-    members: roomQuery.data?.room.members ?? [],
-  });
+  const webrtc = useKaraokeWebRTC({ roomId, memberId: session?.memberId ?? null, role });
   const live = useKaraokeRoomSocket(roomId, session?.memberId ?? null, webrtc.signalingHandlers);
+
+  // Retroactively connect to any already-online listeners whenever the *live* member list
+  // changes (e.g. the singer's mic turns on after several listeners already joined — a brand
+  // new join is separately handled immediately via webrtc.signalingHandlers.onMemberJoined).
+  // Deliberately not a `members` prop on useKaraokeWebRTC itself: that would need `live`
+  // (declared after webrtc, and dependent on webrtc's own signaling handlers) available before
+  // webrtc is constructed — a real circular dependency, not just an ordering inconvenience.
+  const members = live.room?.members ?? roomQuery.data?.room.members ?? [];
+  useEffect(() => {
+    webrtc.ensureConnections(members);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [members]);
 
   useEffect(() => {
     if (live.error) toast.error(live.error);
