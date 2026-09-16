@@ -79,3 +79,16 @@ this agent in this environment. It needs either:
 
 See TASKS_KARAOKE.md for what's been attempted and docs/karaoke-audio.md for the full
 architecture this needs to validate.
+
+**EAS build attempts** (both `--non-interactive`, both from `apps/mobile`):
+- `eas build --profile development --platform android` — **succeeded** in starting (queued and
+  building in EAS's cloud as of this writing; no local Xcode/Android Studio needed at all). Will
+  produce a real installable `.apk` — see the console output linked from this session for the
+  build URL, or run `eas build:list` to find it.
+- `eas build --profile development --platform ios` — **fails immediately** at the credentials
+  step: `"You're in non-interactive mode. EAS CLI couldn't find any credentials suitable for
+  internal distribution. Run this command again in interactive mode."` This needs the user to
+  run `eas build --profile development --platform ios` themselves, interactively, and sign in
+  with their own Apple ID when prompted (a free Apple ID works for internal/development
+  distribution — no paid $99/year Apple Developer Program membership required for this). This is
+  a credential the agent should not and cannot enter on the user's behalf.

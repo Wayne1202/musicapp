@@ -37,11 +37,11 @@ Legend: `[ ]` todo, `[x]` done, `[!]` blocked (see reason + BLOCKED.md)
       apps/mobile/scripts/fix-webrtc-types.js. Full typecheck clean.
 
 ## Mobile — UI
-- [ ] app/karaoke/index.tsx (create/join)
-- [ ] app/karaoke/[code].tsx (room screen, singer vs listener views)
-- [ ] Connection-state UI (connecting/connected/reconnecting/mic unavailable/failed/ended)
-- [ ] Mic permission flow (request on use, not on startup; explain; handle denial)
-- [ ] Entry point from Home screen
+- [x] app/karaoke/index.tsx (create/join)
+- [x] app/karaoke/[code].tsx (room screen, singer vs listener views)
+- [x] Connection-state UI (connecting/connected/reconnecting/mic unavailable/failed/ended)
+- [x] Mic permission flow via expo-audio (request on use, not on startup; explain; handle denial)
+- [x] Entry point from Home screen
 
 ## Verification
 - [ ] Full monorepo typecheck/build
