@@ -50,9 +50,10 @@ Legend: `[ ]` todo, `[x]` done, `[!]` blocked (see reason + BLOCKED.md)
 - [x] Code review pass — found and fixed a real bug (useKaraokeWebRTC's members list was sourced
       from a stale one-time REST snapshot instead of the live socket-updated list; see commit
       b690be8 for the full writeup)
-- [x] Attempt EAS Android build (installable APK, no local Xcode/Android Studio needed) — queued
-      and building in EAS's cloud as of this writing; see BLOCKED.md for the build URL / how to
-      check status (`eas build:list`)
+- [x] EAS Android build **finished successfully** — installable APK:
+      https://expo.dev/artifacts/eas/zRKnpv3xnJP_kivFrjKtu-8smBy_IumCSoCRFiR8Vf4.apk
+      (build id `6a541620-86f6-42ca-a377-9ee634ed4bc5`, configured against the production
+      backend). Ready for the user to install and run Scenario B.
 - [x] Attempted EAS iOS build to confirm exactly where it blocks (Apple credentials, needs the
       user's own interactive login — see BLOCKED.md)
 - [ ] Real WebRTC audio between two devices — genuinely cannot be observed by the agent in this
