@@ -150,7 +150,10 @@ function RoomShell({
       <audio ref={audioRef} autoPlay playsInline hidden />
 
       <div className="flex items-center justify-between border-b border-border pb-4">
-        <h1 className="text-lg font-bold tracking-tight">🔴 Live Karaoke — {code}</h1>
+        <h1 className="flex items-center gap-2 text-lg font-bold tracking-tight">
+          <span className="pulse-dot-red h-2 w-2 rounded-full bg-red-500" />
+          Live Karaoke — {code}
+        </h1>
         <ConnectionBadge connected={connected} />
       </div>
 
@@ -309,7 +312,7 @@ function SingerControls({
 function ConnectionBadge({ connected }: { connected: boolean }) {
   return (
     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-      <span className={`h-2 w-2 rounded-full ${connected ? "bg-primary" : "bg-muted-foreground"}`} />
+      <span className={`h-2 w-2 rounded-full ${connected ? "pulse-dot bg-primary" : "bg-muted-foreground"}`} />
       {connected ? "Connected" : "Connecting…"}
     </div>
   );

@@ -54,7 +54,15 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    /* Two soft, fixed color washes (brand green top-left, violet bottom-right) over the base
+       dark background — replaces a flat single-color body with real depth, without touching
+       any component's actual --background token (so nothing downstream needs to change). */
+    background-color: hsl(var(--background));
+    background-image:
+      radial-gradient(1000px circle at 15% -10%, hsl(142 71% 45% / 0.10), transparent 55%),
+      radial-gradient(900px circle at 100% 10%, hsl(266 80% 60% / 0.08), transparent 55%);
+    background-attachment: fixed;
     /* Keeps content clear of the iPhone notch / home indicator (viewport-fit=cover in layout.tsx). */
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
@@ -88,4 +96,30 @@
 }
 .reaction-float {
   animation: reaction-float 2s ease-out forwards;
+}
+
+/* A "live" connection dot that breathes outward instead of sitting static — used anywhere we
+   show a real-time connected state (room header, karaoke). */
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0.55);
+  }
+  100% {
+    box-shadow: 0 0 0 8px hsl(var(--primary) / 0);
+  }
+}
+.pulse-dot {
+  animation: pulse-ring 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse-ring-red {
+  0% {
+    box-shadow: 0 0 0 0 rgb(239 68 68 / 0.55);
+  }
+  100% {
+    box-shadow: 0 0 0 8px rgb(239 68 68 / 0);
+  }
+}
+.pulse-dot-red {
+  animation: pulse-ring-red 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }

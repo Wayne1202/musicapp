@@ -41,12 +41,17 @@ export default function KaraokeHomePage() {
   });
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-16">
-      <div className="mb-10 flex flex-col items-center gap-3 text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-          <Mic2 className="h-7 w-7 text-primary" />
+    <main className="flex min-h-screen flex-col items-center justify-center px-4 py-16">
+      <div className="mb-10 flex flex-col items-center gap-4 text-center">
+        <div className="relative flex h-20 w-20 items-center justify-center">
+          <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-fuchsia-500/30 to-fuchsia-500/0 blur-xl" />
+          <div className="relative flex h-16 w-16 items-center justify-center rounded-3xl border border-fuchsia-400/20 bg-gradient-to-b from-fuchsia-500/20 to-fuchsia-500/5 shadow-lg shadow-fuchsia-500/10">
+            <Mic2 className="h-8 w-8 text-fuchsia-300" />
+          </div>
         </div>
-        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Karaoke</h1>
+        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
+          🎤 <span className="bg-gradient-to-r from-fuchsia-300 to-primary bg-clip-text text-transparent">Karaoke</span>
+        </h1>
         <p className="max-w-md text-muted-foreground">
           One singer, live mic, everyone else listens in real time over the same backing track.
         </p>

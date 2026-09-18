@@ -1,6 +1,6 @@
 "use client";
 
-import { Users, Wifi, WifiOff } from "lucide-react";
+import { Users, WifiOff } from "lucide-react";
 import type { RoomSettingsDTO } from "@musicapp/shared";
 import { Badge } from "@/components/ui/badge";
 import { RoomSettingsDialog } from "@/components/room/RoomSettingsDialog";
@@ -31,8 +31,12 @@ export function RoomHeader({
           <Badge variant="secondary" className="font-mono tracking-widest">
             {roomCode}
           </Badge>
-          <span className="flex items-center gap-1 text-xs text-muted-foreground">
-            {connected ? <Wifi className="h-3 w-3 text-primary" /> : <WifiOff className="h-3 w-3" />}
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            {connected ? (
+              <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-primary" />
+            ) : (
+              <WifiOff className="h-3 w-3" />
+            )}
             {connected ? "Connected" : "Reconnecting..."}
           </span>
         </div>
