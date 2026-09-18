@@ -2,7 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import type { YoutubeIframeRef } from "react-native-youtube-iframe";
 import { PLAYER_STATES } from "react-native-youtube-iframe";
 import { projectPlaybackPosition, type KaraokeRoomDTO } from "@musicapp/shared";
-import { DRIFT_CHECK_INTERVAL_MS, DRIFT_THRESHOLD_SECONDS, TICK_INTERVAL_MS, safeSeekTo } from "@/lib/youtubeSync";
+import {
+  KARAOKE_DRIFT_CHECK_INTERVAL_MS as DRIFT_CHECK_INTERVAL_MS,
+  KARAOKE_DRIFT_THRESHOLD_SECONDS as DRIFT_THRESHOLD_SECONDS,
+  TICK_INTERVAL_MS,
+  safeSeekTo,
+} from "@/lib/youtubeSync";
 
 export interface KaraokePlaybackController {
   playerRef: React.MutableRefObject<YoutubeIframeRef | null>;
@@ -59,7 +64,7 @@ export function useKaraokePlayback(room: KaraokeRoomDTO | null): KaraokePlayback
       } catch {
         // ignore, fall back to 0
       }
-      if (Math.abs(current - target) > 1.5) {
+      if (Math.abs(current - target) > DRIFT_THRESHOLD_SECONDS) {
         safeSeekTo(player, target);
       }
     })();

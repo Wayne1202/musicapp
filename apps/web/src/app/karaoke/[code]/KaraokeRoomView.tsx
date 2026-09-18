@@ -7,7 +7,13 @@ import { toast } from "sonner";
 import { KaraokeSocketEvents, isValidYouTubeUrl } from "@musicapp/shared";
 import type { KaraokeRoomDTO } from "@musicapp/shared";
 import { getErrorMessage } from "@/lib/api";
-import { getKaraokeRoom, joinKaraokeRoom, selectKaraokeSong } from "@/lib/karaokeApi";
+import {
+  addKaraokeQueueItem,
+  advanceKaraokeQueue,
+  getKaraokeRoom,
+  joinKaraokeRoom,
+  removeKaraokeQueueItem,
+} from "@/lib/karaokeApi";
 import { getStoredDisplayName, storeDisplayName } from "@/lib/session";
 import {
   clearKaraokeRoomSession,
@@ -20,6 +26,8 @@ import { useKaraokeWebRTC } from "@/hooks/useKaraokeWebRTC";
 import { useKaraokePlayback } from "@/hooks/useKaraokePlayback";
 import { getSocket } from "@/lib/socket";
 import { KaraokePlayerEngine } from "@/components/karaoke/KaraokePlayerEngine";
+import { KaraokeListeners } from "@/components/karaoke/KaraokeListeners";
+import { KaraokeQueue } from "@/components/karaoke/KaraokeQueue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -110,7 +118,6 @@ function RoomShell({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const isSinger = room.singerMemberId === session.memberId;
   const singer = room.members.find((m) => m.id === room.singerMemberId);
-  const listenerCount = room.members.filter((m) => m.role === "LISTENER" && m.isOnline).length;
 
   useEffect(() => {
     if (audioRef.current) audioRef.current.srcObject = webrtc.remoteStream;
@@ -150,7 +157,6 @@ function RoomShell({
       <Card>
         <CardContent className="flex flex-col gap-3 pt-6">
           <p className="font-semibold">🎤 Singer: {singer?.displayName ?? "…"}</p>
-          <p className="text-sm text-muted-foreground">Listeners: {listenerCount}</p>
 
           {playback.hasSong ? (
             <div className="flex flex-col gap-2">
@@ -177,6 +183,19 @@ function RoomShell({
 
       {!isSinger && <ListenerConnectionState state={webrtc.listenerConnectionState} />}
 
+      {!isSinger && room.queue.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Up next</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <KaraokeQueue queue={room.queue} />
+          </CardContent>
+        </Card>
+      )}
+
+      <KaraokeListeners members={room.members} />
+
       {isSinger ? (
         <SingerControls room={room} webrtc={webrtc} onEndSession={endSession} />
       ) : (
@@ -198,10 +217,23 @@ function SingerControls({
   onEndSession: () => void;
 }) {
   const [url, setUrl] = useState("");
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
-  const selectSongMutation = useMutation({
-    mutationFn: () => selectKaraokeSong(room.id, room.singerMemberId!, { url: url.trim() }),
+  const addMutation = useMutation({
+    mutationFn: () => addKaraokeQueueItem(room.id, room.singerMemberId!, { url: url.trim() }),
     onSuccess: () => setUrl(""),
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (itemId: string) => removeKaraokeQueueItem(room.id, room.singerMemberId!, itemId),
+    onMutate: (itemId: string) => setRemovingId(itemId),
+    onSettled: () => setRemovingId(null),
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+
+  const nextMutation = useMutation({
+    mutationFn: () => advanceKaraokeQueue(room.id, room.singerMemberId!),
     onError: (err) => toast.error(getErrorMessage(err)),
   });
 
@@ -213,15 +245,17 @@ function SingerControls({
     <div className="flex flex-col gap-4">
       <Card>
         <CardHeader>
-          <CardTitle>Song</CardTitle>
-          <CardDescription>Paste a YouTube link for the backing track.</CardDescription>
+          <CardTitle>Song list</CardTitle>
+          <CardDescription>
+            Paste YouTube links to line up songs — the first one loads automatically, the rest wait here.
+          </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-3">
           <form
             className="flex gap-2"
             onSubmit={(e) => {
               e.preventDefault();
-              selectSongMutation.mutate();
+              addMutation.mutate();
             }}
           >
             <Input
@@ -231,10 +265,18 @@ function SingerControls({
               autoCapitalize="none"
               autoCorrect="off"
             />
-            <Button type="submit" disabled={!isValidYouTubeUrl(url.trim()) || selectSongMutation.isPending}>
-              {selectSongMutation.isPending ? "Setting..." : "Set"}
+            <Button type="submit" disabled={!isValidYouTubeUrl(url.trim()) || addMutation.isPending}>
+              {addMutation.isPending ? "Adding..." : "Add"}
             </Button>
           </form>
+
+          <KaraokeQueue queue={room.queue} onRemove={(itemId) => removeMutation.mutate(itemId)} removingId={removingId} />
+
+          {room.queue.length > 0 && (
+            <Button variant="secondary" onClick={() => nextMutation.mutate()} disabled={nextMutation.isPending}>
+              {nextMutation.isPending ? "Loading…" : "▶ Play Next"}
+            </Button>
+          )}
         </CardContent>
       </Card>
 

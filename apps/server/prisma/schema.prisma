@@ -216,6 +216,7 @@ model KaraokeRoom {
   endedAt   DateTime?
 
   members KaraokeMember[]
+  queue   KaraokeQueueItem[]
 
   @@index([code])
 }
@@ -233,4 +234,22 @@ model KaraokeMember {
 
   @@index([roomId])
   @@index([roomId, isOnline])
+}
+
+// The singer's "up next" list — separate from KaraokeRoom's current* fields (the song actually
+// loaded right now). No addedBy tracking: unlike the listening room's shared QueueItem, only the
+// singer can ever add here, so recording who would just duplicate singerMemberId for no benefit.
+model KaraokeQueueItem {
+  id        String   @id @default(cuid())
+  roomId    String
+  videoId   String
+  title     String
+  thumbnail String
+  duration  Int
+  position  Int
+  createdAt DateTime @default(now())
+
+  room KaraokeRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, position])
 }

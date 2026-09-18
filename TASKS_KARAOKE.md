@@ -112,3 +112,17 @@ ends session. Expect: listener sees "This karaoke session has ended" and is retu
 karaoke home screen; the singer's local peer connections/mic are torn down
 (`webrtc.teardown()`); rejoining the same room code afterward should correctly report "not
 found"-equivalent (room status ENDED) rather than letting anyone back in.
+
+## 2026-09-19 — real-usage improvements (user tested on real devices, reported 5 issues)
+- [x] Tighter backing-track/voice sync for karaoke specifically (1.5s/0.6s vs the listening
+      room's 5s/1.5s) — web + mobile
+- [x] Noise suppression + echo cancellation + auto gain on mic capture — web + mobile
+- [x] Higher-quality voice encoding (128kbps via RTCRtpSender.setParameters) — web + mobile
+- [x] Song queue: KaraokeQueueItem model + migration, add/remove/advance service functions,
+      REST endpoints, "Song list"/"Up Next" UI — web + mobile, verified end-to-end on web
+      (auto-promote-when-empty, append-when-playing, play-next, remove all confirmed working)
+- [x] Listener visibility panel (avatar + name, was just a count before) — web + mobile,
+      verified end-to-end on web (real-time member sync confirmed across two tabs)
+- [!] Real two-device audio quality/latency verification for the above — still gated on the
+      same real-device requirement as the original MVP (mobile needs a build; web needs a real
+      browser, not this dev tool's sandboxed one — see BLOCKED.md)

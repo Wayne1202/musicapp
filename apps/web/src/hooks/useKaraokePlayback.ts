@@ -5,8 +5,12 @@ import type { YouTubeEvent, YouTubePlayer } from "react-youtube";
 import { projectPlaybackPosition, type KaraokeRoomDTO } from "@musicapp/shared";
 
 const TICK_INTERVAL_MS = 500;
-const DRIFT_CHECK_INTERVAL_MS = 5000;
-const DRIFT_THRESHOLD_SECONDS = 1.5;
+// Tighter than the listening room's usePlayerController (5000ms/1.5s): karaoke's backing track
+// has to feel simultaneous with the singer's live WebRTC voice, which arrives in ~100-300ms — a
+// 1.5s-slack drift window reads as audible lyrics/voice latency in a way it never did for casual
+// listening. Still can't be perfect: each listener's own video buffering varies independently.
+const DRIFT_CHECK_INTERVAL_MS = 1500;
+const DRIFT_THRESHOLD_SECONDS = 0.6;
 
 export interface KaraokePlaybackController {
   hasInteracted: boolean;
@@ -58,7 +62,7 @@ export function useKaraokePlayback(room: KaraokeRoomDTO | null): KaraokePlayback
       } catch {
         // ignore, fall back to 0
       }
-      if (Math.abs(current - target) > 1.5) {
+      if (Math.abs(current - target) > DRIFT_THRESHOLD_SECONDS) {
         await player.seekTo(target, true);
       }
       if (room.isPlaying) {

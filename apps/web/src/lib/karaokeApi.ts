@@ -1,4 +1,5 @@
 import type {
+  AddKaraokeQueueItemRequest,
   CreateKaraokeRoomRequest,
   CreateKaraokeRoomResponse,
   JoinKaraokeRoomRequest,
@@ -45,5 +46,27 @@ export function selectKaraokeSong(roomId: string, memberId: string, payload: Sel
     method: "POST",
     headers: { "x-session-id": memberId },
     body: JSON.stringify(payload),
+  });
+}
+
+export function addKaraokeQueueItem(roomId: string, memberId: string, payload: AddKaraokeQueueItemRequest) {
+  return request<{ room: KaraokeRoomDTO }>(`/api/karaoke-rooms/${roomId}/queue`, {
+    method: "POST",
+    headers: { "x-session-id": memberId },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function removeKaraokeQueueItem(roomId: string, memberId: string, itemId: string) {
+  return request<{ room: KaraokeRoomDTO }>(`/api/karaoke-rooms/${roomId}/queue/${itemId}`, {
+    method: "DELETE",
+    headers: { "x-session-id": memberId },
+  });
+}
+
+export function advanceKaraokeQueue(roomId: string, memberId: string) {
+  return request<{ room: KaraokeRoomDTO }>(`/api/karaoke-rooms/${roomId}/queue/next`, {
+    method: "POST",
+    headers: { "x-session-id": memberId },
   });
 }

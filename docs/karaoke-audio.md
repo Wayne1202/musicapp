@@ -146,6 +146,40 @@ it would be exactly the kind of "production-scale infrastructure" the task spec 
   *which* listeners are connected vs. failed individually, only exposes the raw per-peer state
   map (`webrtc.peerStates`) that a future UI pass could surface.
 
+## 2026-09-19 improvements (real user feedback after live testing)
+
+After the karaoke MVP was actually tested on real devices, the user reported audible backing-
+track/voice latency, wanted a song queue instead of one-song-at-a-time, wanted listeners visible
+by name (not just a count, ahead of a possible future tipping feature), and asked for noise
+suppression and a smoother singer voice. What changed:
+
+- **Tighter backing-track sync, karaoke-only**: karaoke's drift-check interval dropped from 5s to
+  1.5s and the correction threshold from 1.5s to 0.6s (`apps/web/src/hooks/useKaraokePlayback.ts`;
+  `apps/mobile/src/lib/youtubeSync.ts`'s new `KARAOKE_DRIFT_*` constants, used only by
+  `apps/mobile/src/hooks/useKaraokePlayback.ts` — the listening room's own constants/behavior are
+  untouched). This meaningfully tightens the gap between each listener's local backing-track
+  position and the singer's near-real-time WebRTC voice, but can't eliminate it — each listener's
+  own video buffering still varies independently. See "Known limitations" below.
+- **Noise suppression + echo cancellation + auto gain**: turned on via standard `getUserMedia`
+  audio constraints (`noiseSuppression`, `echoCancellation`, `autoGainControl`) in both
+  `useKaraokeWebRTC.ts` hooks. Built-in browser/WebRTC feature, not custom DSP.
+- **Higher-quality voice encoding**: the singer's outgoing audio bitrate is explicitly raised to
+  128kbps via the standard `RTCRtpSender.setParameters({encodings: [{maxBitrate}]})` API (not SDP
+  munging) right after `addTrack`, in both hooks. Default WebRTC audio bitrate is tuned for
+  speech calls and can sound compressed for singing's wider dynamic range.
+- **Song queue**: new `KaraokeQueueItem` table + `addKaraokeQueueItem`/`removeKaraokeQueueItem`/
+  `advanceKaraokeQueue` in `karaokeRoomService.ts`, REST endpoints under `/api/karaoke-rooms/
+  :roomId/queue`, and a "Song list"/"Up Next" UI on both platforms. Adding a song when nothing is
+  currently loaded promotes it immediately (no reason to leave it "queued" behind an empty
+  now-playing slot); otherwise it queues behind whatever's current. "Play Next" pops the earliest
+  queued song into the current slot — if the room is already SINGING it plays immediately, if
+  still WAITING it just loads (mirrors `selectKaraokeSong`'s original single-song behavior for
+  that case).
+- **Listener visibility**: a "Listeners" panel (avatar + name, same style as the listening room's
+  Online Users) replaces the old plain listener *count* on both platforms. No tip button yet —
+  that's explicitly deferred (see the memory note on holding monetization work until asked); this
+  pass only makes listener identity visible so a future tip action has somewhere to attach.
+
 ## How this can improve later without a rewrite
 
 The signaling layer, the peer-connection lifecycle, and the backing-track sync are three

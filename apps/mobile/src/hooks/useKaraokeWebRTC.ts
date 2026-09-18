@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RTCPeerConnection, RTCSessionDescription, RTCIceCandidate, mediaDevices } from "react-native-webrtc";
+import type { RTCRtpSender } from "react-native-webrtc";
 import { requestRecordingPermissionsAsync, getRecordingPermissionsAsync } from "expo-audio";
 import { KaraokeSocketEvents } from "@musicapp/shared";
 import type {
@@ -19,6 +20,20 @@ interface PeerEntry {
   pc: RTCPeerConnection;
   pendingCandidates: IceCandidateInit[];
   remoteDescriptionSet: boolean;
+}
+
+// Same rationale/value as the web hook's copy: default Opus bitrate is tuned for speech calls,
+// which can sound compressed for singing. react-native-webrtc implements the same standard
+// RTCRtpSender.getParameters/setParameters API as browsers.
+const SINGER_AUDIO_BITRATE_BPS = 128_000;
+
+function applyHighQualityAudioEncoding(sender: RTCRtpSender) {
+  const params = sender.getParameters();
+  params.encodings = params.encodings?.length ? params.encodings : [{ active: true }];
+  params.encodings[0].maxBitrate = SINGER_AUDIO_BITRATE_BPS;
+  sender.setParameters(params).catch(() => {
+    // Best-effort — some devices/codecs reject certain encoding params.
+  });
 }
 
 /**
@@ -130,7 +145,8 @@ export function useKaraokeWebRTC(params: { roomId: string | null; memberId: stri
       const entry = getOrCreatePeer(listenerId);
       if (localStreamRef.current) {
         localStreamRef.current.getAudioTracks().forEach((track) => {
-          entry.pc.addTrack(track, localStreamRef.current!);
+          const sender = entry.pc.addTrack(track, localStreamRef.current!);
+          applyHighQualityAudioEncoding(sender);
         });
       }
       const offer = await entry.pc.createOffer({});
@@ -243,7 +259,16 @@ export function useKaraokeWebRTC(params: { roomId: string | null; memberId: stri
       setMicPermissionDenied(false);
 
       if (!localStreamRef.current) {
-        localStreamRef.current = await mediaDevices.getUserMedia({ audio: true, video: false });
+        // Standard, built-in WebRTC audio processing — not custom, quality varies by device but
+        // this is a real, free improvement over raw mic input. react-native-webrtc forwards
+        // these keys straight through to the native constraint object; its own
+        // MediaTrackConstraints type just doesn't model audio-specific fields (it's really
+        // shaped for video), hence the cast.
+        localStreamRef.current = await mediaDevices.getUserMedia({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- see comment above
+          audio: { noiseSuppression: true, echoCancellation: true, autoGainControl: true } as any,
+          video: false,
+        });
       } else {
         localStreamRef.current.getAudioTracks().forEach((track) => {
           track.enabled = true;

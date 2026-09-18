@@ -5,12 +5,14 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import YoutubeIframe from "react-native-youtube-iframe";
 import { KaraokeSocketEvents, isValidYouTubeUrl } from "@musicapp/shared";
-import type { KaraokeRoomDTO } from "@musicapp/shared";
+import type { KaraokeMemberDTO, KaraokeQueueItemDTO, KaraokeRoomDTO } from "@musicapp/shared";
 import { colors, radius, spacing } from "@/theme";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { TextField } from "@/components/ui/TextField";
 import { Button } from "@/components/ui/Button";
-import { getKaraokeRoom, selectKaraokeSong } from "@/lib/karaokeApi";
+import { Avatar } from "@/components/ui/Avatar";
+import { avatarColor } from "@/lib/avatarColor";
+import { addKaraokeQueueItem, advanceKaraokeQueue, getKaraokeRoom, removeKaraokeQueueItem } from "@/lib/karaokeApi";
 import { getErrorMessage } from "@/lib/api";
 import { getStoredDisplayName, storeDisplayName } from "@/lib/session";
 import {
@@ -119,7 +121,6 @@ function RoomShell({
   const playback = useKaraokePlayback(room);
   const isSinger = room.singerMemberId === session.memberId;
   const singer = room.members.find((m) => m.id === room.singerMemberId);
-  const listenerCount = room.members.filter((m) => m.role === "LISTENER" && m.isOnline).length;
 
   const leaveRoom = () => {
     webrtc.teardown();
@@ -144,7 +145,6 @@ function RoomShell({
       <Card>
         <CardContent>
           <Text style={styles.singerLine}>🎤 Singer: {singer?.displayName ?? "…"}</Text>
-          <Text style={styles.metaText}>Listeners: {listenerCount}</Text>
 
           {playback.hasSong ? (
             <View style={styles.playerWrap}>
@@ -177,6 +177,19 @@ function RoomShell({
 
       {!isSinger && <ListenerConnectionState state={webrtc.listenerConnectionState} />}
 
+      {!isSinger && room.queue.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Up next</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <KaraokeQueueList queue={room.queue} />
+          </CardContent>
+        </Card>
+      )}
+
+      <KaraokeListeners members={room.members} />
+
       {isSinger ? (
         <SingerControls room={room} webrtc={webrtc} onEndSession={endSession} />
       ) : (
@@ -185,6 +198,69 @@ function RoomShell({
         </Button>
       )}
     </ScrollView>
+  );
+}
+
+function KaraokeListeners({ members }: { members: KaraokeMemberDTO[] }) {
+  const listeners = members.filter((m) => m.role === "LISTENER");
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Listeners ({listeners.length})</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {listeners.length === 0 ? (
+          <Text style={styles.mutedText}>No one&apos;s listening yet — share the room code.</Text>
+        ) : (
+          <View style={{ gap: spacing.sm }}>
+            {listeners.map((listener) => (
+              <View key={listener.id} style={styles.listenerRow}>
+                <Avatar name={listener.displayName} color={avatarColor(listener.id)} size={28} />
+                <Text style={styles.listenerName} numberOfLines={1}>
+                  {listener.displayName}
+                </Text>
+                <View
+                  style={[styles.dot, { backgroundColor: listener.isOnline ? colors.primary : colors.mutedForeground }]}
+                />
+              </View>
+            ))}
+          </View>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function KaraokeQueueList({
+  queue,
+  onRemove,
+  removingId,
+}: {
+  queue: KaraokeQueueItemDTO[];
+  onRemove?: (itemId: string) => void;
+  removingId?: string | null;
+}) {
+  if (queue.length === 0) {
+    return <Text style={styles.mutedText}>Nothing queued yet.</Text>;
+  }
+
+  return (
+    <View style={{ gap: spacing.sm }}>
+      {queue.map((item, index) => (
+        <View key={item.id} style={styles.queueRow}>
+          <Text style={styles.metaText}>{index + 1}</Text>
+          <Text style={styles.queueTitle} numberOfLines={1}>
+            {item.title}
+          </Text>
+          {onRemove && (
+            <Button variant="ghost" onPress={() => onRemove(item.id)} disabled={removingId === item.id} style={{ paddingHorizontal: spacing.sm }}>
+              ✕
+            </Button>
+          )}
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -198,10 +274,23 @@ function SingerControls({
   onEndSession: () => void;
 }) {
   const [url, setUrl] = useState("");
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
-  const selectSongMutation = useMutation({
-    mutationFn: () => selectKaraokeSong(room.id, room.singerMemberId!, { url: url.trim() }),
+  const addMutation = useMutation({
+    mutationFn: () => addKaraokeQueueItem(room.id, room.singerMemberId!, { url: url.trim() }),
     onSuccess: () => setUrl(""),
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (itemId: string) => removeKaraokeQueueItem(room.id, room.singerMemberId!, itemId),
+    onMutate: (itemId: string) => setRemovingId(itemId),
+    onSettled: () => setRemovingId(null),
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+
+  const nextMutation = useMutation({
+    mutationFn: () => advanceKaraokeQueue(room.id, room.singerMemberId!),
     onError: (err) => toast.error(getErrorMessage(err)),
   });
 
@@ -213,8 +302,8 @@ function SingerControls({
     <View style={{ gap: spacing.md }}>
       <Card>
         <CardHeader>
-          <CardTitle>Song</CardTitle>
-          <CardDescription>Paste a YouTube link for the backing track.</CardDescription>
+          <CardTitle>Song list</CardTitle>
+          <CardDescription>Paste YouTube links to line up songs — the first one loads automatically.</CardDescription>
         </CardHeader>
         <CardContent>
           <View style={{ flexDirection: "row", gap: spacing.sm }}>
@@ -228,14 +317,22 @@ function SingerControls({
               autoCorrect={false}
             />
             <Button
-              onPress={() => selectSongMutation.mutate()}
-              disabled={!isValidYouTubeUrl(url.trim()) || selectSongMutation.isPending}
-              loading={selectSongMutation.isPending}
+              onPress={() => addMutation.mutate()}
+              disabled={!isValidYouTubeUrl(url.trim()) || addMutation.isPending}
+              loading={addMutation.isPending}
               style={{ paddingHorizontal: spacing.md }}
             >
-              Set
+              Add
             </Button>
           </View>
+
+          <KaraokeQueueList queue={room.queue} onRemove={(id) => removeMutation.mutate(id)} removingId={removingId} />
+
+          {room.queue.length > 0 && (
+            <Button variant="secondary" onPress={() => nextMutation.mutate()} loading={nextMutation.isPending}>
+              ▶ Play Next
+            </Button>
+          )}
         </CardContent>
       </Card>
 
@@ -354,6 +451,10 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   title: { color: colors.foreground, fontSize: 18, fontWeight: "800" },
   connectionBadge: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  listenerRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  listenerName: { flex: 1, color: colors.foreground, fontSize: 14 },
+  queueRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  queueTitle: { flex: 1, color: colors.foreground, fontSize: 13 },
   dot: { height: 8, width: 8, borderRadius: 4 },
   singerLine: { color: colors.foreground, fontSize: 16, fontWeight: "700", marginBottom: 2 },
   metaText: { color: colors.mutedForeground, fontSize: 13 },

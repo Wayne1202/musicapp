@@ -15,6 +15,20 @@ export interface KaraokeMemberDTO {
   createdAt: string;
 }
 
+/** One song in the singer's "up next" list — see karaokeRoomService's queue functions. Position
+ *  is ascending order, not persisted contiguously (removals leave gaps; reads always ORDER BY
+ *  position, so gaps don't matter). */
+export interface KaraokeQueueItemDTO {
+  id: string;
+  roomId: string;
+  videoId: string;
+  title: string;
+  thumbnail: string;
+  duration: number;
+  position: number;
+  createdAt: string;
+}
+
 /**
  * Deliberately shaped like PlaybackStateDTO (types.ts) for its currentVideoId/Title/Thumbnail/
  * Duration/Timestamp/isPlaying/updatedAt fields — this lets projectPlaybackPosition() (below,
@@ -37,6 +51,8 @@ export interface KaraokeRoomDTO {
   updatedAt: string;
   endedAt: string | null;
   members: KaraokeMemberDTO[];
+  /** Songs lined up after the current one — singer-only to add/remove, visible to everyone. */
+  queue: KaraokeQueueItemDTO[];
 }
 
 export interface CreateKaraokeRoomRequest {
@@ -63,6 +79,10 @@ export interface SelectKaraokeSongRequest {
   thumbnail?: string;
   duration?: number;
 }
+
+/** Same shape as SelectKaraokeSongRequest (exactly one of `url`/`videoId`) — appends to the
+ *  queue instead of replacing the current song outright. */
+export type AddKaraokeQueueItemRequest = SelectKaraokeSongRequest;
 
 // Minimal structural stand-in for the DOM's RTCIceCandidateInit — avoids depending on the "dom"
 // TS lib (not available/appropriate in the server's or React Native's tsconfig) while staying

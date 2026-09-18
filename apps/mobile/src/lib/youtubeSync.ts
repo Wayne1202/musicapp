@@ -9,6 +9,12 @@ export const TICK_INTERVAL_MS = 500;
 export const DRIFT_CHECK_INTERVAL_MS = 5000;
 export const DRIFT_THRESHOLD_SECONDS = 1.5;
 
+// Karaoke-specific, tighter than the listening-room constants above: the backing track has to
+// feel simultaneous with the singer's live WebRTC voice (~100-300ms latency), so the 5s/1.5s
+// slack that's fine for casual listening reads as audible lyrics/voice latency here.
+export const KARAOKE_DRIFT_CHECK_INTERVAL_MS = 1500;
+export const KARAOKE_DRIFT_THRESHOLD_SECONDS = 0.6;
+
 /** `seekTo`'s type says it returns void (fire-and-forget), but the underlying WebView bridge
  *  call can still throw synchronously if the webview ref isn't fully ready yet — don't trust a
  *  WebView-bridged call to be resilient in every player state (see also getCurrentTime()'s own

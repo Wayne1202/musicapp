@@ -21,6 +21,22 @@ interface PeerEntry {
   remoteDescriptionSet: boolean;
 }
 
+// Default WebRTC audio (Opus) bitrate is tuned for speech-call use cases (~32-64kbps), which can
+// sound compressed/artifacty for singing's wider dynamic range. Bump it via the standard
+// RTCRtpSender API (not SDP munging) right after the track is added — best-effort, since not
+// every browser's encoder honors every value.
+const SINGER_AUDIO_BITRATE_BPS = 128_000;
+
+function applyHighQualityAudioEncoding(sender: RTCRtpSender) {
+  const params = sender.getParameters();
+  params.encodings = params.encodings?.length ? params.encodings : [{}];
+  params.encodings[0].maxBitrate = SINGER_AUDIO_BITRATE_BPS;
+  sender.setParameters(params).catch(() => {
+    // Best-effort — some browsers/codecs reject certain encoding params. The call still works
+    // at whatever bitrate the encoder defaults to.
+  });
+}
+
 /**
  * Browser-native counterpart to apps/mobile/src/hooks/useKaraokeWebRTC.ts — same signaling
  * contract, same star topology (singer holds one RTCPeerConnection per listener), same
@@ -141,7 +157,8 @@ export function useKaraokeWebRTC(params: { roomId: string | null; memberId: stri
       const entry = getOrCreatePeer(listenerId);
       if (localStreamRef.current) {
         localStreamRef.current.getAudioTracks().forEach((track) => {
-          entry.pc.addTrack(track, localStreamRef.current!);
+          const sender = entry.pc.addTrack(track, localStreamRef.current!);
+          applyHighQualityAudioEncoding(sender);
         });
       }
       const offer = await entry.pc.createOffer();
@@ -242,7 +259,12 @@ export function useKaraokeWebRTC(params: { roomId: string | null; memberId: stri
     if (role !== "SINGER" || !roomId) return;
     try {
       if (!localStreamRef.current) {
-        localStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        // Standard, built-in browser audio processing — not something custom, quality varies by
+        // device/browser but this is a real, free improvement over raw mic input.
+        localStreamRef.current = await navigator.mediaDevices.getUserMedia({
+          audio: { noiseSuppression: true, echoCancellation: true, autoGainControl: true },
+          video: false,
+        });
       } else {
         localStreamRef.current.getAudioTracks().forEach((track) => {
           track.enabled = true;
