@@ -21,6 +21,7 @@ import { OnlineUsers } from "@/components/room/OnlineUsers";
 import { ChatPanel } from "@/components/room/ChatPanel";
 import { VoteSkipBanner } from "@/components/room/VoteSkipBanner";
 import { ReactionLayer } from "@/components/room/ReactionLayer";
+import { RoomRecap } from "@/components/room/RoomRecap";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -73,9 +74,8 @@ export function RoomView({ code }: { code: string }) {
   if (live.roomEnded || room.status === "ENDED") {
     clearRoomSession(code);
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-2 px-4 text-center">
-        <p className="text-lg font-semibold">This room has ended</p>
-        <p className="text-sm text-muted-foreground">The host closed &quot;{room.name}&quot;.</p>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4">
+        <RoomRecap roomId={room.id} roomName={room.name} />
       </div>
     );
   }

@@ -26,8 +26,20 @@ export function NowPlaying({ playbackState, controller, hostSessionId }: NowPlay
   const duration = playbackState?.currentDuration ?? 0;
 
   return (
-    <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 sm:p-6">
-      <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center">
+    <div className="relative flex flex-col gap-4 overflow-hidden rounded-lg border border-border bg-card p-4 sm:p-6">
+      {/* Ambient album-art glow, Apple Music/Spotify style — same image, heavily blurred and
+          enlarged behind the content, instead of a flat card background. Pure CSS, no canvas/
+          color-extraction, so no CORS risk from YouTube's thumbnail host. */}
+      {playbackState?.currentThumbnail && (
+        <img
+          key={playbackState.currentVideoId}
+          src={playbackState.currentThumbnail}
+          alt=""
+          aria-hidden
+          className="pointer-events-none absolute -inset-10 h-[calc(100%+5rem)] w-[calc(100%+5rem)] scale-125 object-cover opacity-40 blur-3xl saturate-150 transition-opacity duration-700"
+        />
+      )}
+      <div className="relative flex flex-col items-center gap-4 sm:flex-row sm:items-center">
         <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-secondary shadow-lg sm:h-32 sm:w-32">
           {playbackState?.currentThumbnail ? (
             <>

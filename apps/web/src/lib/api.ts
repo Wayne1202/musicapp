@@ -9,6 +9,7 @@ import type {
   RecentlyPlayedResponse,
   RoomDTO,
   RoomHistoryResponse,
+  RoomRecapResponse,
   SearchResultDTO,
   SearchSongsResponse,
 } from "@musicapp/shared";
@@ -140,6 +141,10 @@ export function getRecentlyPlayed(roomId: string, limit?: number) {
 
 export function getRoomHistory(roomId: string) {
   return request<RoomHistoryResponse>(`/api/rooms/${roomId}/history`);
+}
+
+export function getRoomRecap(roomId: string) {
+  return request<RoomRecapResponse>(`/api/rooms/${roomId}/recap`);
 }
 
 export function getChatHistory(roomId: string) {

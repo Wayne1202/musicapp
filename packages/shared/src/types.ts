@@ -180,6 +180,26 @@ export interface RecentlyPlayedResponse {
   items: RecentlyPlayedItemDTO[];
 }
 
+/**
+ * "Session recap" — a Spotify-Wrapped-style summary shown when a room ends. Built entirely from
+ * data already tracked for other reasons (RecentlyPlayedItem, UserSession, Room.createdAt) — no
+ * new persistence needed. Reactions aren't included since they're deliberately ephemeral
+ * (broadcast-only, never persisted) — see ReactionLayer.
+ */
+export interface RoomRecapDTO {
+  roomName: string;
+  roomCode: string;
+  songsPlayed: number;
+  totalListeners: number;
+  topContributor: { name: string; songCount: number } | null;
+  durationMinutes: number;
+  highlights: RecentlyPlayedItemDTO[];
+}
+
+export interface RoomRecapResponse {
+  recap: RoomRecapDTO;
+}
+
 export interface ChatHistoryResponse {
   messages: ChatMessageDTO[];
 }

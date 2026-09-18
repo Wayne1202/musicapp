@@ -1,7 +1,8 @@
 import { Router } from "express";
-import type { RecentlyPlayedResponse, RoomHistoryEntryDTO, RoomHistoryResponse } from "@musicapp/shared";
+import type { RecentlyPlayedResponse, RoomHistoryEntryDTO, RoomHistoryResponse, RoomRecapResponse } from "@musicapp/shared";
 import { getRecentlyPlayed } from "../services/recentlyPlayedService";
 import { getRoomEvents } from "../services/roomEventService";
+import { getRoomRecap } from "../services/recapService";
 
 /** Read-only recently-played + full room-history endpoints, split out for the same reason
  *  routes/queue.ts was: a cohesive, small unit that doesn't belong bloating routes/rooms.ts. */
@@ -35,6 +36,20 @@ export function createHistoryRouter(): Router {
         ...songs.map((song): RoomHistoryEntryDTO => ({ kind: "song", at: song.playedAt, song })),
       ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
       res.json({ entries } satisfies RoomHistoryResponse);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // Spotify-Wrapped-style summary, fetched once when a room ends (see RoomView's ended state).
+  router.get("/:roomId/recap", async (req, res, next) => {
+    try {
+      const recap = await getRoomRecap(req.params.roomId);
+      if (!recap) {
+        res.status(404).json({ message: "Room not found" });
+        return;
+      }
+      res.json({ recap } satisfies RoomRecapResponse);
     } catch (err) {
       next(err);
     }
