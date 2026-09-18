@@ -1,9 +1,17 @@
 import { io, type Socket } from "socket.io-client";
-import type { ClientToServerEvents, ServerToClientEvents } from "@musicapp/shared";
+import type {
+  ClientToServerEvents,
+  KaraokeClientToServerEvents,
+  KaraokeServerToClientEvents,
+  ServerToClientEvents,
+} from "@musicapp/shared";
 
 export const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL ?? "http://localhost:4000";
 
-export type AppSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
+export type AppSocket = Socket<
+  ServerToClientEvents & KaraokeServerToClientEvents,
+  ClientToServerEvents & KaraokeClientToServerEvents
+>;
 
 let socket: AppSocket | null = null;
 

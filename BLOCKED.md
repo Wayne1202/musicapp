@@ -99,10 +99,47 @@ time, so the original already-queued build would not have retroactively picked t
   resubmitted after fixing the env-vars gotcha above). No local Xcode/Android Studio needed at
   all. Check status: `eas build:view 6a541620-86f6-42ca-a377-9ee634ed4bc5`, or
   https://expo.dev/accounts/wayne1202/projects/musicapp-mobile/builds/6a541620-86f6-42ca-a377-9ee634ed4bc5
-- `eas build --profile development --platform ios` — **fails immediately** at the credentials
-  step: `"You're in non-interactive mode. EAS CLI couldn't find any credentials suitable for
-  internal distribution. Run this command again in interactive mode."` This needs the user to
-  run `eas build --profile development --platform ios` themselves, interactively, and sign in
-  with their own Apple ID when prompted (a free Apple ID works for internal/development
-  distribution — no paid $99/year Apple Developer Program membership required for this). This is
-  a credential the agent should not and cannot enter on the user's behalf.
+- `eas build --profile development --platform ios` — **fails immediately** in non-interactive
+  mode at the credentials step: `"You're in non-interactive mode. EAS CLI couldn't find any
+  credentials suitable for internal distribution. Run this command again in interactive mode."`
+  This needs the user to run the command themselves, interactively — a credential the agent
+  should not and cannot enter on the user's behalf.
+  The user did run it interactively (2026-09-18) and got past the Node version issue (same
+  `toReversed is not a function` Metro-config bug as the local dev server — needs
+  `/usr/local/opt/node@20/bin` on PATH, see CLAUDE.md's "Local setup" section) and past the
+  encryption-compliance/env-var prompts, but then hit a **real, corrected finding**: Apple
+  rejected credential setup with `"You are not registered as an Apple Developer"`. **Correction
+  to what was previously written here**: a free Apple ID is *not* sufficient for this path — EAS
+  cloud builds with internal distribution need to register an App ID + provisioning profile via
+  the Apple Developer Portal, which requires an actual paid **Apple Developer Program membership
+  ($99/year)**. The earlier "free Apple ID works, no paid membership needed" claim in this file
+  was wrong and is retracted. Real options for real iOS device testing, in order of cost:
+  1. Pay for the Apple Developer Program, then rerun the same command — everything else about the
+     flow (env vars, encryption question, Node version) is already verified working.
+  2. Use Expo Go instead (free) for everything except karaoke specifically — karaoke's
+     `react-native-webrtc` dependency is a native module Expo Go can't run (see the "Karaoke:
+     react-native-webrtc cannot run in Expo Go" section above); the rest of the mobile app works
+     fine in Expo Go today.
+  3. Local Xcode "personal team" signing (free, cable-connected device, no cloud build, app
+     expires after 7 days and needs re-signing) — needs full Xcode installed first, which this
+     Mac doesn't have yet (see "iOS Simulator unavailable" section above).
+  4. **Use the web app instead** (added 2026-09-18, see below) — karaoke now also exists at
+     `apps/web`'s `/karaoke`, using the browser's native WebRTC support. No native module, no
+     EAS build, no Apple Developer Program, no App Store at all — just open the page. This is a
+     genuinely easier path to a working 2-device karaoke test than any of the above.
+
+## Karaoke on web: real mic audio can't be tested in this dev environment's browser tool
+
+`apps/web`'s karaoke port (see `PROJECT_KARAOKE.md`'s "Web port" section) was verified
+end-to-end in two browser tabs — room creation, real YouTube metadata, the WAITING→SINGING
+transition, live listener-count sync, and the full room-ended lifecycle all passed. The one
+thing that couldn't be exercised here: actually calling `getUserMedia()` and hearing real audio.
+This Claude Code session's Browser-pane tool sandboxes microphone access outright (confirmed via
+an explicit tool notice: "the page... requested microphone access, which is blocked in the
+Browser pane"), and the code's `catch` path correctly surfaced this as a permission-denied state
+in the UI rather than crashing — so the *handling* is verified, just not real audio capture.
+
+Unlike the mobile blockers above, this needs **no build, no install, no account** to resolve —
+just open `/karaoke` in two real browser tabs (or two devices) outside this sandboxed tool, e.g.
+on the deployed `musicapp-web-fawn.vercel.app`, or `localhost:3000` from a real desktop Chrome/
+Safari/Firefox window. That's the only remaining step for a real karaoke test on web.

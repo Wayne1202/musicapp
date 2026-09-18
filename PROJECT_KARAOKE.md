@@ -120,3 +120,29 @@ addressed in `docs/karaoke-audio.md`.
 - **Backend**: `apps/server/src/routes/karaoke.ts`, `services/karaokeRoomService.ts`,
   `socket/karaoke.ts`, `middleware/karaokeSessionAuth.ts` (mirrors `sessionAuth.ts` but checks
   `KaraokeMember` instead of `UserSession`).
+
+## Web port (2026-09-18)
+
+Karaoke was originally built mobile-only. Added to `apps/web` afterward, reusing 100% of the
+backend/signaling above unchanged — only a browser-native frontend was needed:
+
+- `apps/web/src/lib/{karaokeApi,karaokeSession,iceServers}.ts`, `apps/web/src/lib/socket.ts`
+  widened the same way `apps/mobile`'s was (`AppSocket` type includes the Karaoke event maps).
+- `apps/web/src/hooks/{useKaraokeRoomSocket,useKaraokeWebRTC,useKaraokePlayback}.ts` — near-
+  verbatim ports of the mobile hooks. The one real difference: `useKaraokeWebRTC.ts` uses
+  `RTCPeerConnection`/`RTCSessionDescription`/`RTCIceCandidate`/`MediaStream` as **browser
+  globals** (no `react-native-webrtc` import, no native module, no EAS/Xcode/Apple Developer
+  Program needed at all) and exposes a `remoteStream` the room UI binds to a hidden `<audio
+  autoPlay>` element — browsers don't auto-route an incoming remote track to the speakers the way
+  react-native-webrtc does, so this explicit binding is web's one extra step.
+- `apps/web/src/app/karaoke/page.tsx` (create/join) and `apps/web/src/app/karaoke/[code]/
+  KaraokeRoomView.tsx` (room, role-conditional singer/listener UI) — mirror the mobile screens,
+  shadcn/ui instead of the mobile UI primitives.
+- Verified end-to-end in two browser tabs (singer + listener): room create, real YouTube metadata
+  fetch, WAITING→SINGING transition, live member-count sync, mic-permission-denial handling, and
+  full room-ended lifecycle (listener redirected, room session cleared) — all passed. The actual
+  `getUserMedia` capture itself couldn't be exercised because this dev environment's browser tool
+  sandboxes microphone access outright (analogous to Expo Go blocking `react-native-webrtc`
+  entirely on mobile) — needs a real browser on a real device, same as mobile's remaining gap.
+- Because this uses the browser's native WebRTC support, web karaoke has **no** equivalent to
+  mobile's EAS-build/Apple-Developer-Program blocker (see `BLOCKED.md`) — it's just a page load.

@@ -62,6 +62,20 @@ Legend: `[ ]` todo, `[x]` done, `[!]` blocked (see reason + BLOCKED.md)
 - [x] Document manual test steps for Scenarios A-E (see the final report / this file's "test
       plan" — everything is written and ready for the user to run once a device build exists)
 
+## Web port (2026-09-18)
+- [x] apps/web: karaokeApi/karaokeSession/iceServers lib files, socket.ts widened
+- [x] apps/web: useKaraokeRoomSocket, useKaraokeWebRTC (browser-native RTCPeerConnection, no
+      library needed), useKaraokePlayback hooks
+- [x] apps/web: /karaoke (create/join) and /karaoke/[code] (room) pages, home page entry link
+- [x] Full monorepo typecheck clean (`npx tsc --noEmit` in apps/web)
+- [x] Verified end-to-end in two browser tabs: create room, real YouTube metadata fetch,
+      Start Singing (WAITING→SINGING), listener join + live member-count sync, mic-permission-
+      denial handling, End Session → listener sees "session has ended" + redirected
+- [!] Real two-way mic audio on web — this dev environment's browser tool sandboxes
+      `getUserMedia` outright (confirmed via an explicit tool notice), so it can't be exercised
+      here; needs a real desktop/mobile browser. No install/build step required to test this,
+      unlike mobile — just open the page in two browser tabs or two devices.
+
 ## Known blockers (see BLOCKED.md for detail)
 - [!] react-native-webrtc cannot run in Expo Go — needs a custom dev client (in progress via EAS)
 - [!] iOS dev client build needs either local Xcode (already blocked, see BLOCKED.md) or the

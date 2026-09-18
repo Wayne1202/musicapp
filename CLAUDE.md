@@ -4,8 +4,12 @@
 
 A web app where friends join a shared room, queue YouTube songs, and listen
 together in sync while playing games or browsing other tabs. Background
-playback (tab not focused) is a hard requirement. Karaoke and voice chat are
-explicitly out of scope for now.
+playback (tab not focused) is a hard requirement.
+
+A karaoke feature (one singer streams live mic audio via WebRTC over a
+synced YouTube backing track; everyone else listens) was added later on top
+of this MVP — see "Karaoke feature" in Status below and `PROJECT_KARAOKE.md`.
+Voice chat beyond that is still out of scope.
 
 **Auth:** guest-only. Users enter a display name and get a session ID stored
 in `localStorage`. No email/OAuth.
@@ -40,7 +44,7 @@ now playing (art, title, progress, play/pause/skip) → queue + online users
 side by side.
 
 **Constraints:** TypeScript everywhere, Next.js App Router, shadcn/ui (no
-plain HTML controls), no Firebase/Supabase, guest sessions only, no karaoke.
+plain HTML controls), no Firebase/Supabase, guest sessions only.
 
 ## Tech stack
 
@@ -90,8 +94,7 @@ history feed, presence (typing indicator, colored avatars), reactions,
 vote-to-skip, room settings (queue lock, skip mode, etc.), toast
 notifications for room events, a mobile-web bottom mini-player bar, and a
 real-time room chat with @mentions. Not implemented: auth beyond guest
-sessions, Spotify integration, karaoke — all explicitly out of scope per
-the spec.
+sessions, Spotify integration — out of scope per the spec.
 
 **Phase 5 (native mobile app, `apps/mobile`)**: near full feature parity
 with apps/web, verified end-to-end (create/join room, real-time sync with
@@ -106,6 +109,26 @@ substitute). See `progress.md` for the phase-by-phase build log and
 machine at the time this was built, no Android emulator) that limited how
 much of it could be self-verified
 versus needing manual testing.
+
+**Karaoke feature** (added on top of the MVP, on both platforms): one
+SINGER selects a YouTube song and streams live mic audio over WebRTC to
+LISTENERS, who also hear the same backing track via the existing playback-
+sync mechanism (`projectPlaybackPosition`) — no new infrastructure, reuses
+the same Socket.IO server for signaling. Backend: `KaraokeRoom`/
+`KaraokeMember` Prisma models, `apps/server/src/{routes,socket,services}/
+karaoke*`. Mobile (`apps/mobile/app/karaoke/*`): uses `react-native-webrtc`,
+a native module — needs a custom EAS dev-client build (Android build
+verified working; iOS needs a paid Apple Developer Program membership, see
+`BLOCKED.md`) since it can't run in Expo Go. Web (`apps/web/src/app/
+karaoke/*`, added 2026-09-18): uses the browser's native WebRTC support
+instead — no native module, no build/account needed at all, verified
+end-to-end in two browser tabs (mic capture itself untested only because
+this dev environment's browser tool sandboxes it, see `BLOCKED.md`). Full
+details: `PROJECT_KARAOKE.md`, `docs/karaoke-audio.md`, `TASKS_KARAOKE.md`.
+**Long-term direction** (not yet built): the user wants web and mobile to
+converge into one system with real cross-device login rather than today's
+guest-only, per-device sessions — see memory note on this if picking up
+auth/identity work.
 
 **Known platform limitation** (not a bug, and confirmed not fixable by going
 native either): audio does not continue when a phone's browser is

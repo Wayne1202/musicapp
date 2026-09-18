@@ -1,4 +1,5 @@
-import { Music2 } from "lucide-react";
+import Link from "next/link";
+import { Mic2, Music2 } from "lucide-react";
 import { CreateRoomForm } from "@/components/home/CreateRoomForm";
 import { JoinRoomForm } from "@/components/home/JoinRoomForm";
 
@@ -19,6 +20,14 @@ export default function HomePage() {
         <CreateRoomForm />
         <JoinRoomForm />
       </div>
+
+      <Link
+        href="/karaoke"
+        className="mt-6 flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <Mic2 className="h-4 w-4" />
+        🎤 Try Karaoke
+      </Link>
     </main>
   );
 }
